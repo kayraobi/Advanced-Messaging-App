@@ -33,7 +33,7 @@ const ProfileScreen = ({ onMyEvents, onSettings, onLogout }: ProfileScreenProps)
 
   const menuItems = [
     {
-      icon: 'calendar-check-outline' as const,
+      icon: 'calendar-clear-outline' as const,
       label: 'My Events',
       onPress: onMyEvents,
       danger: false,

@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { events } from '../data/events';
+import { socketService } from '../services/socketService';
 
 interface ChatMessage {
   id: string;
@@ -114,27 +115,61 @@ const ChatDetailScreen = ({ chatId, onBack }: ChatDetailScreenProps) => {
   const dmProfile = isDm ? dmProfiles[chatId] : null;
   const event = !isDm ? events.find((e) => e.id === chatId) : null;
 
-  const initial = isDm ? (dmMessages[chatId] || []) : (chatMessages[chatId] || []);
-  const [messages, setMessages] = useState<ChatMessage[]>(initial);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
   const [showPoll, setShowPoll] = useState(true);
 
   const chatTitle = isDm ? dmProfile?.name ?? 'Chat' : event?.title ?? 'Chat';
 
+  React.useEffect(() => {
+    const socket = socketService.connect();
+    socket.emit('join_room', chatId);
+
+    const handlePrevious = (msgs: any[]) => {
+      const formatted = msgs.map((m) => ({
+        id: m.id,
+        sender: m.senderId === 'me' ? 'You' : m.senderName,
+        initials: m.senderName.substring(0, 2).toUpperCase(),
+        text: m.content,
+        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isMe: m.senderId === 'me',
+      }));
+      setMessages(formatted);
+    };
+
+    const handleReceive = (m: any) => {
+      const formatted = {
+        id: m.id,
+        sender: m.senderId === 'me' ? 'You' : m.senderName,
+        initials: m.senderName.substring(0, 2).toUpperCase(),
+        text: m.content,
+        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isMe: m.senderId === 'me',
+      };
+      setMessages((prev) => [...prev, formatted]);
+    };
+
+    socket.on('previous_messages', handlePrevious);
+    socket.on('receive_message', handleReceive);
+
+    return () => {
+      socket.off('previous_messages', handlePrevious);
+      socket.off('receive_message', handleReceive);
+    };
+  }, [chatId]);
+
   const sendMessage = () => {
     if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        sender: 'You',
-        initials: 'TT',
-        text: input.trim(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: true,
-      },
-    ]);
+    
+    const socket = socketService.connect();
+    socket.emit('send_message', {
+      roomId: chatId,
+      senderId: 'me',
+      senderName: 'You',
+      content: input.trim(),
+    });
+    
     setInput('');
   };
 

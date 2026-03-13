@@ -70,6 +70,25 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
         </View>
       </View>
 
+      {/* BACKEND TEST BUTTON */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+        <TouchableOpacity
+          style={{ backgroundColor: colors.primary, padding: 12, borderRadius: 8, alignItems: 'center' }}
+          onPress={async () => {
+            try {
+              // Simülatör için localhost (iOS)
+              const res = await fetch('http://localhost:3000/api/events');
+              const data = await res.json();
+              alert(`Backend Test Successful! Found ${data.data?.length || 0} events.`);
+            } catch (err: any) {
+              alert(`Backend Error: ${err.message}. \n\nMake sure backend is running.`);
+            }
+          }}
+        >
+          <Text style={{ color: 'white', fontWeight: 'bold' }}>Test Backend Connection 🚀</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Reminder Banner */}
       {showReminder && (
         <View style={[styles.reminder, { backgroundColor: colors.primary + '1A' }]}>
