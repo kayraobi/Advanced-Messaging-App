@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { events } from '../data/events';
+import { useEventCountdown } from '../hooks/useEventCountdown';
 
 const categoryColors: Record<string, string> = {
   Social: '#f97316',
@@ -71,6 +72,7 @@ const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
   const isFull = event.filled >= event.capacity;
   const attendees = mockAttendees.slice(0, event.filled);
   const catColor = categoryColors[event.category] ?? colors.primary;
+  const { label: countdownLabel, isPast } = useEventCountdown(event);
 
   const perPerson =
     totalAmount && Number(totalAmount) > 0
@@ -181,6 +183,29 @@ const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
 
       {/* Bottom Join Button */}
       <View style={[styles.joinBarWrap, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+        <View
+          style={[
+            styles.countdownChip,
+            {
+              backgroundColor: isPast ? colors.muted : '#ecfdf5',
+              borderColor: isPast ? colors.border : '#bbf7d0',
+            },
+          ]}
+        >
+          <Ionicons
+            name={isPast ? 'flag-outline' : 'time-outline'}
+            size={16}
+            color={isPast ? colors.mutedForeground : '#10b981'}
+          />
+          <Text
+            style={[
+              styles.countdownText,
+              { color: isPast ? colors.mutedForeground : '#10b981' },
+            ]}
+          >
+            {countdownLabel}
+          </Text>
+        </View>
         <TouchableOpacity
           style={[
             styles.joinBtn,
@@ -366,6 +391,21 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 16,
     borderTopWidth: 1,
+  },
+  countdownChip: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  countdownText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   joinBtn: {
     height: 50,
