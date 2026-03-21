@@ -16,10 +16,11 @@ const allInterests = ['Sports', 'Culture', 'Food & Drink', 'Tech', 'Networking',
 interface ProfileScreenProps {
   onMyEvents: () => void;
   onSettings: () => void;
+  onFAQ: () => void;
   onLogout: () => void;
 }
 
-const ProfileScreen = ({ onMyEvents, onSettings, onLogout }: ProfileScreenProps) => {
+const ProfileScreen = ({ onMyEvents, onSettings, onFAQ, onLogout }: ProfileScreenProps) => {
   const { colors } = useTheme();
   const [showInterests, setShowInterests] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(['Sports', 'Food & Drink']);
@@ -42,6 +43,12 @@ const ProfileScreen = ({ onMyEvents, onSettings, onLogout }: ProfileScreenProps)
       icon: 'settings-outline' as const,
       label: 'App Settings',
       onPress: onSettings,
+      danger: false,
+    },
+    {
+      icon: 'help-circle-outline' as const,
+      label: 'FAQ',
+      onPress: onFAQ,
       danger: false,
     },
   ];

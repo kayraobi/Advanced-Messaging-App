@@ -1,6 +1,8 @@
 export interface Event {
   id: string;
   title: string;
+  // Prefer this field once the real API is connected.
+  startsAt?: string;
   date: string;
   time: string;
   location: string;
