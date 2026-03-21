@@ -246,11 +246,11 @@ Planned / proposal-aligned areas for further evolution:
 
 According to the proposal:
 
-- Fatih Bahadır Karakuş — Frontend Developer & Documentation Lead
-- Ömer Faruk Yaşar — Backend Developer & Documentation
-- Taylan Taşkın — Real-Time Systems & DevOps Engineer
-- Kayra Yılmaz — Project Manager & Backend Developer
-- Ata Arda Kara — QA & Database Engineer
+- Fatih Bahadır Karakuş — Frontend Developer & Backend Developer
+- Ömer Faruk Yaşar — Backend Developer & Frontend Developer
+- Taylan Taşkın — Real-Time Systems & Backend Developer
+- Kayra Yılmaz — Lead Developer
+- Ata Arda Kara — Database Engineer
 
 ## Repository Notes
 
