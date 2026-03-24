@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,8 +8,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { FAQ_SOURCE_URL, faqs } from '../data/faqs';
+import { FaqItem } from '../data/faqs';
 import { useTheme } from '../contexts/ThemeContext';
+import { faqService } from '../services';
 
 interface FAQScreenProps {
   onBack: () => void;
@@ -19,6 +19,34 @@ interface FAQScreenProps {
 export default function FAQScreen({ onBack }: FAQScreenProps) {
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [items, setItems] = useState<FaqItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadFaqs = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await faqService.getAll();
+        if (active) setItems(data);
+      } catch (e) {
+        if (active) {
+          setError(e instanceof Error ? e.message : 'Failed to load FAQ data.');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadFaqs();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -34,38 +62,41 @@ export default function FAQScreen({ onBack }: FAQScreenProps) {
         contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <View
-          style={[
-            styles.sourceCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.sourceTop}>
-            <View style={[styles.sourceIcon, { backgroundColor: colors.primary + '14' }]}>
-              <Ionicons name="globe-outline" size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.sourceTitle, { color: colors.foreground }]}>
-                Sarajevo Expats Q&A
-              </Text>
-              <Text style={[styles.sourceDesc, { color: colors.mutedForeground }]}>
-                This section is wired to mirror the website FAQ structure once live data is available.
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.sourceLink, { borderColor: colors.border }]}
-            onPress={() => Linking.openURL(FAQ_SOURCE_URL)}
+        {loading ? (
+          <View
+            style={[
+              styles.emptyCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
           >
-            <Text style={[styles.sourceLinkText, { color: colors.primary }]}>
-              Open source page
+            <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '14' }]}>
+              <Ionicons name="hourglass-outline" size={24} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              Loading FAQ
             </Text>
-            <Ionicons name="open-outline" size={16} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {faqs.length === 0 ? (
+            <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
+              We are preparing the question and answer list for the Sarajevo Expats help section.
+            </Text>
+          </View>
+        ) : error ? (
+          <View
+            style={[
+              styles.emptyCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <View style={[styles.emptyIcon, { backgroundColor: '#ef444415' }]}>
+              <Ionicons name="alert-circle-outline" size={24} color="#ef4444" />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              FAQ could not be loaded
+            </Text>
+            <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
+              {error}
+            </Text>
+          </View>
+        ) : items.length === 0 ? (
           <View
             style={[
               styles.emptyCard,
@@ -79,11 +110,11 @@ export default function FAQScreen({ onBack }: FAQScreenProps) {
               No published questions yet
             </Text>
             <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
-              The current Sarajevo Expats Q&A page does not list any questions yet. As soon as the real API is connected, this screen can render them without changing the UI structure.
+              The current Sarajevo Expats Q&A page does not list any questions yet. Once the backend exposes FAQ data, this screen can show it without changing the UI structure.
             </Text>
           </View>
         ) : (
-          faqs.map((item) => {
+          items.map((item) => {
             const isOpen = openId === item.id;
 
             return (
@@ -139,47 +170,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
-  sourceCard: {
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 16,
-    gap: 14,
-  },
-  sourceTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  sourceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sourceTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sourceDesc: {
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
-  },
-  sourceLink: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  sourceLinkText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   emptyCard: {
     borderWidth: 1,
     borderRadius: 18,

@@ -5,7 +5,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3030';
 
 // Hostinger API hazır olana kadar true tut.
 // API gelince .env'de EXPO_PUBLIC_USE_MOCK=false yap — kod değişmez.
-export const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK === 'true';
+export const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK !== 'false';
 
 const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
