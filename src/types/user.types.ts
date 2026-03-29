@@ -1,24 +1,29 @@
-// Swagger'daki gerçek User şeması
 export interface User {
+  _id: string;
   username: string;
   email: string;
+  type: string; // "GM" veya başka roller — Ibrahim'den öğrenince genişletiriz
 }
 
-// POST /api/users/login → request body
 export interface LoginRequest {
   email: string;
   password: string;
 }
 
-// Auth netleşince burası güncellenecek
+// Response sadece token döndürüyor
 export interface LoginResponse {
-  username: string;
-  email: string;
-  // token: string  ← cookie mi body mi geldiği belli değil
+  token: string;
 }
 
 export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
+}
+
+// JWT içindeki payload yapısı
+export interface JwtPayload {
+  user: User;
+  iat: number;
+  exp: number;
 }

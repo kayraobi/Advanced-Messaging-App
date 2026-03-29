@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authService } from '../services';
 import {
   View,
   Text,
@@ -32,14 +33,24 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
     confirmPassword: '',
   });
 
-  const handleLogin = () => {
-    if (
-      loginForm.email === 'admin@sarajevoexpats.com' &&
-      loginForm.password === 'admin123'
-    ) {
+  const handleLogin = async () => {
+    try {
+      // 1. Sabit stringleri sildik, kullanıcının ekrana yazdığı form verilerini gönderiyoruz.
+      const user = await authService.login({
+        email: loginForm.email,
+        password: loginForm.password,
+      });
+
+      console.log(user.username); // "test"
+      console.log(user.type);     // "GM"
+
+      // 2. Olmayan 'navigation' yerine, yukarıdan aldığımız 'onLogin' prop'unu tetikliyoruz.
       onLogin();
-    } else {
-      Alert.alert('Giriş başarısız', 'Email veya şifre hatalı.');
+
+    } catch (error: any) {
+      // (Opsiyonel) Kullanıcıya hatayı göstermek için bir Alert ekleyebilirsin
+      Alert.alert('Giriş Başarısız', error.message || 'Lütfen bilgilerinizi kontrol edin.');
+      console.error(error.message);
     }
   };
 
