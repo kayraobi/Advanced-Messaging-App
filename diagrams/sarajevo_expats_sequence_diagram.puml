@@ -1,0 +1,226 @@
+@startuml SarajevoExpats_SequenceDiagram
+
+title SarajevoExpats — Sequence Diagram (with Activation Bars)
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 15
+
+skinparam sequence {
+  ArrowColor                  #374151
+  ArrowFontSize               15
+  ArrowFontStyle              bold
+  ActorBorderColor            #2E7D32
+  ActorBackgroundColor        #E8F5E9
+  ActorFontSize               16
+  ActorFontStyle              bold
+  LifeLineBorderColor         #9CA3AF
+  LifeLineBackgroundColor     #F3F4F6
+  ParticipantBorderColor      #4A6CF7
+  ParticipantBackgroundColor  #EEF2FF
+  ParticipantFontSize         16
+  ParticipantFontStyle        bold
+  ParticipantFontName         Arial
+  BoxBorderColor              #E5E7EB
+  BoxBackgroundColor          #F9FAFB
+  NoteBackgroundColor         #FEF9C3
+  NoteBorderColor             #F59E0B
+  NoteFontSize                14
+  DividerBackgroundColor      #4A6CF7
+  DividerFontColor            #FFFFFF
+  DividerFontSize             17
+  DividerFontStyle            bold
+  GroupBorderColor            #9CA3AF
+  GroupBackgroundColor        #F3F4F6
+  ActivationBorderColor       #4A6CF7
+  ActivationBackgroundColor   #C7D2FE
+}
+skinparam ResponseMessageBelowArrow true
+
+' ══════════════════════════════════════════════════
+'  PARTICIPANTS
+' ══════════════════════════════════════════════════
+actor       "User"              as User
+boundary    "AuthScreen"        as AuthScreen
+boundary    "HomeScreen"        as HomeScreen
+boundary    "EventDetailScreen" as EDS
+boundary    "ChatsScreen"       as ChatsScreen
+boundary    "GlobalChatScreen"  as GCS
+control     "AuthService"       as AuthSvc
+control     "EventService"      as EventSvc
+control     "ChatService"       as ChatSvc
+control     "Backend API"       as API
+control     "Socket.IO Server"  as SocketIO
+entity      "ChatRepository"    as ChatRepo
+entity      "MongoDB"           as DB
+control     "AI Moderator"      as AI
+
+' ══════════════════════════════════════════════════
+== Scenario 1: Login Flow ==
+' ══════════════════════════════════════════════════
+
+User        ->  AuthScreen  ++  : enter email + password
+User        ->  AuthScreen      : tap LOGIN
+AuthScreen  ->  AuthSvc     ++  : login({ email, password })
+AuthSvc     ->  API         ++  : POST /api/auth/login
+API         ->  DB          ++  : verify credentials (bcrypt)
+
+alt Credentials valid
+  DB        -->  API        --  : user record found
+  API       -->  AuthSvc    --  : { token, user }
+  AuthSvc   -->  AuthScreen --  : decoded User object
+  AuthScreen --> User       --  : navigate → HomeScreen
+  note right of AuthScreen
+    onLogin() is called.
+    App renders HomeScreen.
+  end note
+
+else Invalid credentials
+  DB        -->  API        --  : not found / hash mismatch
+  API       -->  AuthSvc    --  : 401 Unauthorized
+  AuthSvc   --> AuthScreen  --  : throw Error
+  AuthScreen --> User       --  : Alert "Login Failed"
+end
+
+' ══════════════════════════════════════════════════
+== Scenario 2: Register Flow ==
+' ══════════════════════════════════════════════════
+
+User       ->  AuthScreen  ++ : enter username, email, phone, password
+User       ->  AuthScreen     : tap CREATE ACCOUNT
+AuthScreen ->  AuthScreen     : validate password == confirmPassword
+
+alt Passwords match
+  AuthScreen ->  AuthSvc   ++ : register({ username, email, password })
+  AuthSvc    ->  API       ++ : POST /api/auth/register
+  API        ->  DB        ++ : insert User (hashed password)
+  DB        -->  API       -- : { _id, username, email }
+  API       -->  AuthSvc   -- : 201 Created
+  AuthSvc   -->  AuthScreen-- : success
+  AuthScreen --> User      -- : onLogin() → HomeScreen
+
+else Passwords mismatch
+  AuthScreen --> User      -- : Alert "Passwords don't match"
+end
+
+' ══════════════════════════════════════════════════
+== Scenario 3: RSVP / Join Event Flow ==
+' ══════════════════════════════════════════════════
+
+User       ->  HomeScreen  ++ : tap event card
+HomeScreen ->  EDS         ++ : onEventPress(eventId)
+EDS        ->  EventSvc    ++ : getEventById(eventId)
+EventSvc   ->  API         ++ : GET /api/events/:id
+API        ->  DB          ++ : find event by id
+DB        -->  API         -- : Event document
+API       -->  EventSvc    -- : Event object
+EventSvc  -->  EDS            : Event
+deactivate EventSvc
+EDS       -->  HomeScreen  -- : (render)
+deactivate HomeScreen
+EDS       -->  User           : render event detail
+
+User       ->  EDS            : tap "Join"
+EDS        ->  EventSvc    ++ : rsvpToEvent(eventId)
+EventSvc   ->  API         ++ : POST /api/events/:id/rsvp
+API        ->  DB          ++ : check filled vs capacity
+
+alt Spots available
+  DB       -->  API        -- : increment filled, add userId
+  API      -->  EventSvc   -- : 200 OK
+  EventSvc -->  EDS        -- : success
+  EDS      ->   EDS           : setIsJoined(true)
+  EDS      -->  User          : Alert "You're going to this event!"
+
+else Event is full
+  DB       -->  API        -- : add userId to waitlist
+  API      -->  EventSvc   -- : 200 OK (waitlisted)
+  EventSvc --> EDS         -- : waitlisted
+  EDS      ->   EDS           : setIsJoined(true)
+  EDS      -->  User          : Alert "Added to the waitlist"
+end
+
+deactivate EDS
+
+' ══════════════════════════════════════════════════
+== Scenario 4: Real-time Chat (Socket.IO) ==
+' ══════════════════════════════════════════════════
+
+User        ->  ChatsScreen ++ : tap "Global Community Chat"
+ChatsScreen ->  GCS         ++ : onGlobalChatPress()
+deactivate ChatsScreen
+
+GCS         ->  ChatSvc     ++ : joinRoom("global")
+ChatSvc     ->  SocketIO    ++ : emit join_room
+
+SocketIO    ->  ChatRepo    ++ : getMessagesByRoomId("global")
+ChatRepo    ->  DB          ++ : query messages
+DB         -->  ChatRepo    -- : messages[]
+ChatRepo   -->  SocketIO    -- : messages[]
+
+SocketIO   -->  GCS            : emit previous_messages
+deactivate ChatSvc
+GCS        -->  User           : render chat history
+
+note over GCS, SocketIO
+  WebSocket connection stays
+  open (persistent lifetime).
+end note
+
+User        ->  GCS            : type message + tap Send
+GCS         ->  ChatSvc     ++ : sendMessage("global", text)
+ChatSvc     ->  SocketIO       : emit send_message\n{ roomId, senderId, content }
+
+SocketIO    ->  ChatRepo    ++ : saveMessage(data)
+ChatRepo    ->  DB          ++ : insert Message document
+DB         -->  ChatRepo    -- : saved Message
+ChatRepo   -->  SocketIO    -- : Message
+
+SocketIO   -->  GCS            : emit receive_message (broadcast)
+deactivate SocketIO
+deactivate ChatSvc
+GCS        ->   GCS            : append message to list
+deactivate GCS
+
+' ══════════════════════════════════════════════════
+== Scenario 5: AI Auto-Moderation ==
+' ══════════════════════════════════════════════════
+
+User        ->  GCS         ++ : send message
+GCS         ->  ChatSvc     ++ : sendMessage("global", text)
+ChatSvc     ->  SocketIO    ++ : emit send_message
+
+SocketIO    ->  AI          ++ : analyze content
+
+alt Content is safe
+  AI       -->  SocketIO    -- : flagged: false
+  SocketIO ->   ChatRepo    ++ : saveMessage({ hidden: false })
+  ChatRepo ->   DB          ++ : insert Message
+  DB       -->  ChatRepo    -- : saved
+  ChatRepo -->  SocketIO    -- : Message
+  SocketIO -->  GCS            : emit receive_message (visible)
+  deactivate ChatSvc
+  GCS      ->   GCS            : render normal message bubble
+  GCS      -->  User        -- : visible message
+
+else Inappropriate content detected
+  AI       -->  SocketIO    -- : flagged: true
+  SocketIO ->   ChatRepo    ++ : saveMessage({ hidden: true })
+  ChatRepo ->   DB          ++ : insert with hidden = true
+  DB       -->  ChatRepo    -- : saved
+  ChatRepo -->  SocketIO    -- : Message (hidden)
+  SocketIO -->  GCS            : emit receive_message (hidden: true)
+  deactivate ChatSvc
+  GCS      ->   GCS            : render "🛡️ [Message hidden by AI]"
+  note right of GCS
+    hidden=true messages are
+    stored but rendered as
+    italic muted text for all
+    room members.
+  end note
+  GCS      -->  User        -- : muted hidden message
+end
+
+deactivate SocketIO
+deactivate GCS
+
+@enduml

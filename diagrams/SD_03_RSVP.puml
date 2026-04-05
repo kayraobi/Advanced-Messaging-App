@@ -1,0 +1,74 @@
+@startuml SD_03_RSVP
+
+title Scenario 3 — RSVP / Join Event Flow
+
+skinparam defaultFontName  Arial
+skinparam defaultFontSize  18
+
+skinparam sequence {
+  ArrowColor                  #374151
+  ArrowFontSize               17
+  ArrowFontStyle              bold
+  ActorBorderColor            #2E7D32
+  ActorBackgroundColor        #E8F5E9
+  ActorFontSize               19
+  ActorFontStyle              bold
+  LifeLineBorderColor         #9CA3AF
+  LifeLineBackgroundColor     #F3F4F6
+  ParticipantBorderColor      #4A6CF7
+  ParticipantBackgroundColor  #EEF2FF
+  ParticipantFontSize         18
+  ParticipantFontStyle        bold
+  NoteBackgroundColor         #FEF9C3
+  NoteBorderColor             #F59E0B
+  NoteFontSize                16
+  GroupBorderColor            #9CA3AF
+  GroupBackgroundColor        #F3F4F6
+  ActivationBorderColor       #4A6CF7
+  ActivationBackgroundColor   #C7D2FE
+}
+skinparam ResponseMessageBelowArrow true
+
+actor      "User"              as User
+boundary   "HomeScreen"        as Home
+boundary   "EventDetailScreen" as EDS
+control    "EventService"      as EventSvc
+control    "Backend API"       as API
+entity     "MongoDB"           as DB
+
+User       ->  Home        ++ : tap event card
+Home       ->  EDS         ++ : onEventPress(eventId)
+EDS        ->  EventSvc    ++ : getEventById(eventId)
+EventSvc   ->  API         ++ : GET /api/events/:id
+API        ->  DB          ++ : find event by id
+DB        -->  API         -- : Event document
+API       -->  EventSvc    -- : Event object
+EventSvc  -->  EDS            : Event
+deactivate EventSvc
+EDS       -->  Home        -- : (render)
+deactivate Home
+EDS       -->  User           : render event detail
+
+User       ->  EDS            : tap "Join"
+EDS        ->  EventSvc    ++ : rsvpToEvent(eventId)
+EventSvc   ->  API         ++ : POST /api/events/:id/rsvp
+API        ->  DB          ++ : check filled vs capacity
+
+alt Spots available
+  DB       -->  API        -- : increment filled, add userId
+  API      -->  EventSvc   -- : 200 OK
+  EventSvc -->  EDS        -- : success
+  EDS      ->   EDS           : setIsJoined(true)
+  EDS      -->  User          : Alert "You're going to this event!"
+
+else Event is full
+  DB       -->  API        -- : add userId to waitlist
+  API      -->  EventSvc   -- : 200 OK (waitlisted)
+  EventSvc --> EDS         -- : waitlisted
+  EDS      ->   EDS           : setIsJoined(true)
+  EDS      -->  User          : Alert "Added to the waitlist"
+end
+
+deactivate EDS
+
+@enduml

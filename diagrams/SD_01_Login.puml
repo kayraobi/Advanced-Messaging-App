@@ -1,0 +1,61 @@
+@startuml SD_01_Login
+
+title Scenario 1 — Login Flow
+
+skinparam defaultFontName  Arial
+skinparam defaultFontSize  18
+
+skinparam sequence {
+  ArrowColor                  #374151
+  ArrowFontSize               17
+  ArrowFontStyle              bold
+  ActorBorderColor            #2E7D32
+  ActorBackgroundColor        #E8F5E9
+  ActorFontSize               19
+  ActorFontStyle              bold
+  LifeLineBorderColor         #9CA3AF
+  LifeLineBackgroundColor     #F3F4F6
+  ParticipantBorderColor      #4A6CF7
+  ParticipantBackgroundColor  #EEF2FF
+  ParticipantFontSize         18
+  ParticipantFontStyle        bold
+  NoteBackgroundColor         #FEF9C3
+  NoteBorderColor             #F59E0B
+  NoteFontSize                16
+  GroupBorderColor            #9CA3AF
+  GroupBackgroundColor        #F3F4F6
+  ActivationBorderColor       #4A6CF7
+  ActivationBackgroundColor   #C7D2FE
+}
+skinparam ResponseMessageBelowArrow true
+
+actor      "User"        as User
+boundary   "AuthScreen"  as AuthScreen
+control    "AuthService" as AuthSvc
+control    "Backend API" as API
+entity     "MongoDB"     as DB
+
+User       ->  AuthScreen  ++ : enter email + password
+User       ->  AuthScreen      : tap LOGIN
+AuthScreen ->  AuthSvc     ++ : login({ email, password })
+AuthSvc    ->  API         ++ : POST /api/auth/login
+API        ->  DB          ++ : verify credentials (bcrypt)
+
+alt Credentials valid
+  DB       -->  API        -- : user record found
+  API      -->  AuthSvc    -- : { token, user }
+  AuthSvc  -->  AuthScreen -- : decoded User object
+  AuthScreen --> User      -- : navigate → HomeScreen
+  note right of AuthScreen
+    onLogin() is called.
+    App renders HomeScreen.
+  end note
+
+else Invalid credentials
+  DB       -->  API        -- : not found / hash mismatch
+  API      -->  AuthSvc    -- : 401 Unauthorized
+  AuthSvc  -->  AuthScreen -- : throw Error
+  AuthScreen --> User      -- : Alert "Login Failed"
+end
+
+@enduml
