@@ -1,0 +1,19 @@
+node_modules
+
+# ─── Environment variables — NEVER push these ────────────────
+# Frontend
+.env
+.env.local
+.env.production
+
+# Backend
+backend/.env
+backend/.env.*
+# (backend/.env.example is OK to commit — it has no real secrets)
+
+# Expo
+.expo/
+dist/
+
+# OS
+.DS_Store
