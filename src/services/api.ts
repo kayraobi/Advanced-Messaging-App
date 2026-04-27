@@ -51,6 +51,7 @@ export const handleError = (error: unknown): never => {
     if (status === 404) throw new Error('Not found.');
     if (status === 500) throw new Error('Server error. Please try again later.');
     if (msg)            throw new Error(msg);
+    if (!error.response) throw new Error('Network error. Check API URL and internet connection.');
     if (error.code === 'ECONNABORTED') throw new Error('Request timed out.');
   }
   throw new Error('An unexpected error occurred.');

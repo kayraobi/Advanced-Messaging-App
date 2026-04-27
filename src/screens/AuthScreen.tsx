@@ -23,6 +23,7 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
@@ -35,10 +36,11 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
 
   const handleLogin = async () => {
     try {
+      setIsSubmitting(true);
       // 1. Sabit stringleri sildik, kullanıcının ekrana yazdığı form verilerini gönderiyoruz.
       const user = await authService.login({
-        email: loginForm.email,
-        password: loginForm.password,
+        email: loginForm.email.trim(),
+        password: loginForm.password.trim(),
       });
 
       console.log(user.username); // "test"
@@ -51,6 +53,8 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
       // (Opsiyonel) Kullanıcıya hatayı göstermek için bir Alert ekleyebilirsin
       Alert.alert('Giriş Başarısız', error.message || 'Lütfen bilgilerinizi kontrol edin.');
       console.error(error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -204,16 +208,20 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
 
         {tab === 'login' ? (
           <View style={s.form}>
-            {renderInput('Email Address *', loginForm.email, (v) => setLoginForm({ ...loginForm, email: v }), { keyboard: 'email-address' })}
+            {renderInput('Email or Username *', loginForm.email, (v) => setLoginForm({ ...loginForm, email: v }), { keyboard: 'email-address' })}
             {renderInput('Password *', loginForm.password, (v) => setLoginForm({ ...loginForm, password: v }), {
               secure: true, show: showPassword, onToggle: () => setShowPassword(!showPassword),
             })}
             <View style={s.forgotRow}>
               <Text style={s.forgotText}>Forgot Password?</Text>
             </View>
-            <Text style={s.hint}>Test account: admin@sarajevoexpats.com / admin123</Text>
-            <TouchableOpacity style={s.primaryBtn} onPress={handleLogin}>
-              <Text style={s.primaryBtnText}>LOGIN</Text>
+            <Text style={s.hint}>Test account: test@example.com / test123</Text>
+            <TouchableOpacity
+              style={[s.primaryBtn, isSubmitting && { opacity: 0.7 }]}
+              onPress={handleLogin}
+              disabled={isSubmitting}
+            >
+              <Text style={s.primaryBtnText}>{isSubmitting ? 'LOGGING IN...' : 'LOGIN'}</Text>
             </TouchableOpacity>
             <View style={s.dividerRow}>
               <View style={s.divider} />

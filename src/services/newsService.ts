@@ -1,5 +1,5 @@
 import api, { handleError, USE_MOCK } from './api';
-import { News } from '../types/news.types';
+import { News, NewsListResponse } from '../types/news.types';
 
 // Mock data — Hostinger API hazır olana kadar kullanılır
 const MOCK_NEWS: News[] = [
@@ -30,14 +30,34 @@ const MOCK_NEWS: News[] = [
 ];
 
 export const newsService = {
+  getPage: async (page = 1, limit = 10): Promise<NewsListResponse> => {
+    if (USE_MOCK) {
+      return {
+        data: MOCK_NEWS,
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: MOCK_NEWS.length,
+        itemsPerPage: limit,
+        hasNextPage: false,
+        hasPrevPage: false,
+      };
+    }
+
+    try {
+      const res = await api.get<NewsListResponse>(`/api/news?page=${page}&limit=${limit}`);
+      return res.data;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
 
   // HomeScreen carousel
   // GET /api/news/slides
   getSlides: async (): Promise<News[]> => {
     if (USE_MOCK) return MOCK_NEWS.filter(n => n.showInSlider);
     try {
-      const res = await api.get<News[]>('/api/news/slides');
-      return res.data;
+      const res = await api.get<News[] | NewsListResponse>('/api/news/slides');
+      return Array.isArray(res.data) ? res.data : res.data.data;
     } catch (e) {
       throw handleError(e);
     }
@@ -48,8 +68,8 @@ export const newsService = {
   getLatest: async (): Promise<News[]> => {
     if (USE_MOCK) return MOCK_NEWS;
     try {
-      const res = await api.get<News[]>('/api/news/latest');
-      return res.data;
+      const res = await api.get<News[] | NewsListResponse>('/api/news/latest');
+      return Array.isArray(res.data) ? res.data : res.data.data;
     } catch (e) {
       throw handleError(e);
     }
@@ -60,8 +80,8 @@ export const newsService = {
   getAll: async (): Promise<News[]> => {
     if (USE_MOCK) return MOCK_NEWS;
     try {
-      const res = await api.get<News[]>('/api/news');
-      return res.data;
+      const res = await api.get<News[] | NewsListResponse>('/api/news');
+      return Array.isArray(res.data) ? res.data : res.data.data;
     } catch (e) {
       throw handleError(e);
     }

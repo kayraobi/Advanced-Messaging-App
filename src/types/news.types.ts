@@ -7,5 +7,15 @@ export interface News extends MongoDocument {
   pictureDescription?: string;
   sources: string;
   showInSlider: boolean;
-  slidePriority: number;
+  slidePriority: number | null;
+}
+
+export interface NewsListResponse {
+  data: News[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
 }
