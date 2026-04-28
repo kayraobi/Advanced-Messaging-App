@@ -1,49 +1,20 @@
-import api, { handleError, USE_MOCK } from './api';
+import api, { handleError } from './api';
 import { Event } from '../types/event.types';
-
-const MOCK_EVENTS: Event[] = [
-  {
-    _id: '1',
-    content: ['Coffee & Connect at Kibe Mahala'],
-    images: [],
-    videos: [],
-    url: ['https://instagram.com/p/example1'],
-    timestamp: new Date().toISOString(),
-    pinned: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    _id: '2',
-    content: ['Language Exchange Night'],
-    images: [],
-    videos: [],
-    url: ['https://instagram.com/p/example2'],
-    timestamp: new Date().toISOString(),
-    pinned: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
 
 export const eventService = {
 
-  // CalendarScreen — tüm etkinlikler
-  // GET /api/events
-  getAll: async (): Promise<Event[]> => {
-    if (USE_MOCK) return MOCK_EVENTS;
+  // GET /api/events — Returns all events
+  async getAll(): Promise<any[]> {
     try {
-      const res = await api.get<Event[]>('/api/events');
-      return res.data;
+      const res = await api.get<{ data: any[] }>('/api/events');
+      return res.data?.data ?? res.data;
     } catch (e) {
       throw handleError(e);
     }
   },
 
-  // HomeScreen — öne çıkan 10 etkinlik
-  // GET /api/events/featured
-  getFeatured: async (): Promise<Event[]> => {
-    if (USE_MOCK) return MOCK_EVENTS.slice(0, 3);
+  // GET /api/events/featured — Get featured 10 events
+  async getFeatured(): Promise<Event[]> {
     try {
       const res = await api.get<Event[]>('/api/events/featured');
       return res.data;
@@ -52,10 +23,8 @@ export const eventService = {
     }
   },
 
-  // Sabitlenmiş etkinlikler
-  // GET /api/events/pinned
-  getPinned: async (): Promise<Event[]> => {
-    if (USE_MOCK) return MOCK_EVENTS.filter(e => e.pinned);
+  // GET /api/events/pinned — Returns all pinned events
+  async getPinned(): Promise<Event[]> {
     try {
       const res = await api.get<Event[]>('/api/events/pinned');
       return res.data;
@@ -64,17 +33,59 @@ export const eventService = {
     }
   },
 
-  // EventDetailScreen
-  // GET /api/events/{id}
-  getById: async (id: string): Promise<Event> => {
-    if (USE_MOCK) {
-      const found = MOCK_EVENTS.find(e => e._id === id);
-      if (!found) throw new Error('Event not found.');
-      return found;
-    }
+  // GET /api/events/{id} — Get an event by ID
+  async getById(id: string): Promise<Event> {
     try {
       const res = await api.get<Event>(`/api/events/${id}`);
       return res.data;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  // POST /api/events — Fetch and create new event from Instagram post
+  async create(data: { url: string }): Promise<Event> {
+    try {
+      const res = await api.post<Event>('/api/events', data);
+      return res.data;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  // POST /api/events/full — Fetch and create new events from Instagram
+  async createFull(data: { url: string }): Promise<Event[]> {
+    try {
+      const res = await api.post<Event[]>('/api/events/full', data);
+      return res.data;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  // PUT /api/events/{id} — Update an event
+  async update(id: string, data: Partial<Event>): Promise<Event> {
+    try {
+      const res = await api.put<Event>(`/api/events/${id}`, data);
+      return res.data;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  // DELETE /api/events/{id} — Delete an event
+  async deleteById(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/events/${id}`);
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  // DELETE /api/events/delete-image/{id} — Delete an image from an event
+  async deleteImage(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/events/delete-image/${id}`);
     } catch (e) {
       throw handleError(e);
     }

@@ -10,9 +10,11 @@ export interface LoginRequest {
   password: string;
 }
 
-// Response sadece token döndürüyor
 export interface LoginResponse {
+  success?: boolean;
   token: string;
+  user?: Partial<User>;
+  message?: string;
 }
 
 export interface RegisterRequest {

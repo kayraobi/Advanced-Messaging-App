@@ -17,11 +17,20 @@ import { newsArticles, NewsArticle } from '../data/news';
 import { events } from '../data/events';
 import NewsCard from '../components/NewsCard';
 import EventCard from '../components/EventCard';
+import { News } from '../types/news.types';
+import { newsService } from '../services';
+import { USE_MOCK } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
-const featured = newsArticles.filter((a) => a.featured);
-const latest = newsArticles.filter((a) => !a.featured);
+const toNewsArticle = (newsItem: News): NewsArticle => ({
+  id: newsItem._id,
+  title: newsItem.title,
+  snippet: newsItem.content.replace(/<[^>]+>/g, '').trim(),
+  date: newsItem.createdAt,
+  image: newsItem.pictures[0] ?? 'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80',
+  featured: newsItem.showInSlider,
+});
 
 interface HomeScreenProps {
   onEventPress: (id: string) => void;
@@ -34,20 +43,57 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [articleOpen, setArticleOpen] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
+  const [articles, setArticles] = useState<NewsArticle[]>(USE_MOCK ? newsArticles : []);
+  const [isNewsLoading, setIsNewsLoading] = useState<boolean>(!USE_MOCK);
+  const [newsError, setNewsError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
+  const featured = articles.filter((a) => a.featured);
+  const latest = articles.filter((a) => !a.featured);
+
   const next = useCallback(() => {
+    if (featured.length === 0) return;
     setCurrent((c) => {
-      const next = (c + 1) % featured.length;
-      flatListRef.current?.scrollToIndex({ index: next, animated: true });
-      return next;
+      const nextIndex = (c + 1) % featured.length;
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      return nextIndex;
     });
+  }, [featured.length]);
+
+  useEffect(() => {
+    const loadNews = async () => {
+      try {
+        setIsNewsLoading(true);
+        setNewsError(null);
+        const apiNews = await newsService.getAll();
+        setArticles(apiNews.map(toNewsArticle));
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Failed to fetch news.';
+        setNewsError(message);
+        if (USE_MOCK) setArticles(newsArticles);
+      } finally {
+        setIsNewsLoading(false);
+      }
+    };
+
+    loadNews();
   }, []);
 
   useEffect(() => {
+    if (featured.length === 0) return;
     const timer = setInterval(next, 5000);
     return () => clearInterval(timer);
-  }, [next]);
+  }, [next, featured.length]);
+
+  useEffect(() => {
+    if (featured.length === 0) {
+      setCurrent(0);
+      return;
+    }
+    if (current >= featured.length) {
+      setCurrent(0);
+    }
+  }, [featured.length, current]);
 
   const currentArticle = featured[current];
 
@@ -87,6 +133,12 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
       {/* Featured News Carousel */}
       <View style={styles.section}>
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>FEATURED NEWS</Text>
+        {isNewsLoading && (
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Loading news...</Text>
+        )}
+        {!isNewsLoading && newsError && (
+          <Text style={{ color: '#ef4444', fontSize: 13 }}>{newsError}</Text>
+        )}
         <FlatList
           ref={flatListRef}
           data={featured}
@@ -94,8 +146,13 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={(e) => {
-            const idx = Math.round(e.nativeEvent.contentOffset.x / (width - 32));
-            setCurrent(idx);
+            if (featured.length === 0) return;
+            const denominator = width - 32;
+            if (!denominator) return;
+            const idx = Math.round(e.nativeEvent.contentOffset.x / denominator);
+            if (Number.isNaN(idx)) return;
+            const boundedIdx = Math.min(Math.max(idx, 0), Math.max(featured.length - 1, 0));
+            setCurrent(boundedIdx);
           }}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -125,6 +182,7 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
             <TouchableOpacity
               key={i}
               onPress={() => {
+                if (featured.length === 0) return;
                 flatListRef.current?.scrollToIndex({ index: i, animated: true });
                 setCurrent(i);
               }}
