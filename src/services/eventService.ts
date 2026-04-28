@@ -4,10 +4,10 @@ import { Event } from '../types/event.types';
 export const eventService = {
 
   // GET /api/events — Returns all events
-  async getAll(): Promise<Event[]> {
+  async getAll(): Promise<any[]> {
     try {
-      const res = await api.get<Event[]>('/api/events');
-      return res.data;
+      const res = await api.get<{ data: any[] }>('/api/events');
+      return res.data?.data ?? res.data;
     } catch (e) {
       throw handleError(e);
     }
