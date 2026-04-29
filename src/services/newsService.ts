@@ -54,7 +54,6 @@ export const newsService = {
   // HomeScreen carousel
   // GET /api/news/slides
   getSlides: async (): Promise<News[]> => {
-    if (USE_MOCK) return MOCK_NEWS.filter(n => n.showInSlider);
     try {
       const res = await api.get<News[] | NewsListResponse>('/api/news/slides');
       return Array.isArray(res.data) ? res.data : res.data.data;
@@ -66,7 +65,6 @@ export const newsService = {
   // HomeScreen liste
   // GET /api/news/latest
   getLatest: async (): Promise<News[]> => {
-    if (USE_MOCK) return MOCK_NEWS;
     try {
       const res = await api.get<News[] | NewsListResponse>('/api/news/latest');
       return Array.isArray(res.data) ? res.data : res.data.data;
@@ -78,7 +76,6 @@ export const newsService = {
   // Tüm haberler
   // GET /api/news
   getAll: async (): Promise<News[]> => {
-    if (USE_MOCK) return MOCK_NEWS;
     try {
       const res = await api.get<News[] | NewsListResponse>('/api/news');
       return Array.isArray(res.data) ? res.data : res.data.data;
