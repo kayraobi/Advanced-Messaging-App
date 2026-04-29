@@ -13,24 +13,27 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { newsArticles, NewsArticle } from '../data/news';
 import { events } from '../data/events';
 import NewsCard from '../components/NewsCard';
 import EventCard from '../components/EventCard';
 import { News } from '../types/news.types';
+import { UINewsArticle } from '../types/ui-news.types';
 import { newsService } from '../services';
-import { USE_MOCK } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
-const toNewsArticle = (newsItem: News): NewsArticle => ({
-  id: newsItem._id,
-  title: newsItem.title,
-  snippet: newsItem.content.replace(/<[^>]+>/g, '').trim(),
-  date: newsItem.createdAt,
-  image: newsItem.pictures[0] ?? 'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80',
-  featured: newsItem.showInSlider,
-});
+const toNewsArticle = (newsItem: News): UINewsArticle => {
+  const plainContent = newsItem.content.replace(/<[^>]+>/g, '').trim();
+  return {
+    id: newsItem._id,
+    title: newsItem.title,
+    snippet: plainContent,
+    content: plainContent,
+    date: newsItem.createdAt,
+    image: newsItem.pictures[0] ?? 'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80',
+    featured: newsItem.showInSlider,
+  };
+};
 
 interface HomeScreenProps {
   onEventPress: (id: string) => void;
@@ -42,9 +45,9 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
   const [showReminder, setShowReminder] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [articleOpen, setArticleOpen] = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
-  const [articles, setArticles] = useState<NewsArticle[]>(USE_MOCK ? newsArticles : []);
-  const [isNewsLoading, setIsNewsLoading] = useState<boolean>(!USE_MOCK);
+  const [selectedArticle, setSelectedArticle] = useState<UINewsArticle | null>(null);
+  const [articles, setArticles] = useState<UINewsArticle[]>([]);
+  const [isNewsLoading, setIsNewsLoading] = useState<boolean>(true);
   const [newsError, setNewsError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -70,7 +73,6 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to fetch news.';
         setNewsError(message);
-        if (USE_MOCK) setArticles(newsArticles);
       } finally {
         setIsNewsLoading(false);
       }
@@ -240,12 +242,17 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
               <>
                 <Image source={{ uri: selectedArticle.image }} style={styles.articleImage} />
                 <Text style={[styles.articleTitle, { color: colors.foreground }]}>{selectedArticle.title}</Text>
-                <Text style={[styles.articleBody, { color: colors.mutedForeground }]}>
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                </Text>
-                <Text style={[styles.articleBody, { color: colors.mutedForeground, marginTop: 12 }]}>
-                  Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-                </Text>
+                {selectedArticle.content
+                  .split(/\n+/)
+                  .filter(Boolean)
+                  .map((paragraph, index) => (
+                    <Text
+                      key={`${selectedArticle.id}-${index}`}
+                      style={[styles.articleBody, { color: colors.mutedForeground, marginTop: index === 0 ? 0 : 12 }]}
+                    >
+                      {paragraph}
+                    </Text>
+                  ))}
               </>
             )}
           </ScrollView>
