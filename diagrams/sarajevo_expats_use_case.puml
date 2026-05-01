@@ -1,0 +1,157 @@
+@startuml SarajevoExpats_UseCaseDiagram
+
+title SarajevoExpats — Use Case Diagram
+
+scale 1.5
+
+left to right direction
+
+skinparam defaultFontName  Arial
+skinparam defaultFontSize  15
+
+skinparam ActorStyle awesome
+skinparam usecase {
+  BackgroundColor #EEF2FF
+  BorderColor     #4A6CF7
+  FontSize        15
+  FontStyle       bold
+  FontName        Arial
+}
+skinparam actor {
+  BackgroundColor #E8F5E9
+  BorderColor     #2E7D32
+  FontSize        16
+  FontStyle       bold
+  FontName        Arial
+}
+skinparam rectangle {
+  BackgroundColor #F9FAFB
+  BorderColor     #9CA3AF
+  FontSize        16
+  FontStyle       bold
+  FontName        Arial
+  RoundCorner     15
+}
+skinparam ArrowColor     #374151
+skinparam ArrowFontSize  13
+skinparam ArrowFontStyle bold
+skinparam nodesep 30
+skinparam ranksep 45
+
+' ═══════════════════════════════
+'  ACTORS  (sol)
+' ═══════════════════════════════
+actor "Guest"    as Guest
+actor "Member"   as Member
+actor "GM"       as GM
+
+GM -down-|> Member : <<extend>>
+
+' ═══════════════════════════════
+'  ACTOR  (sağ)
+' ═══════════════════════════════
+actor "System"   as System
+
+' ═══════════════════════════════
+'  ANA SINIR
+' ═══════════════════════════════
+rectangle "SarajevoExpats" {
+
+  ' ── SÜTUN 1 - SATIR 1 ──────────────
+  rectangle "🔐 Authentication" as RAUTH {
+    usecase "Register"  as UC1
+    usecase "Log In"     as UC2
+    usecase "Log Out"    as UC3
+  }
+
+  ' ── SÜTUN 2 - SATIR 1 ──────────────
+  rectangle "🏠 Content" as RCONT {
+    usecase "Browse News\nand Events"  as UC4
+    usecase "Read an Article"          as UC5
+    usecase "Search Content"           as UC6
+  }
+
+  ' ── SÜTUN 1 - SATIR 2 ──────────────
+  rectangle "📅 Events" as REVT {
+    usecase "View Event Details"    as UC7
+    usecase "RSVP to an Event"      as UC8
+    usecase "Join the Waitlist"     as UC9
+    usecase "Split Event Costs"     as UC10
+    usecase "View My Events"        as UC11
+    usecase "Create an Event"       as UC12
+  }
+
+  ' ── SÜTUN 2 - SATIR 2 ──────────────
+  rectangle "💬 Messaging" as RMSG {
+    usecase "Access Global Chat"      as UC13
+    usecase "Join Event Group Chat"   as UC14
+    usecase "Send Direct Message"     as UC15
+  }
+
+  ' ── SÜTUN 1 - SATIR 3 ──────────────
+  rectangle "👤 Profile & Settings" as RPROF {
+    usecase "Manage Profile\nand Interests"  as UC16
+    usecase "Change App Settings"            as UC17
+  }
+
+  ' ── SÜTUN 2 - SATIR 3 ──────────────
+  rectangle "🤖 System Actions" as RSYS {
+    usecase "Receive Real-Time\nMessages"          as UC18
+    usecase "Moderate Messages\nAutomatically (AI)" as UC19
+  }
+
+  ' ── GRID hizalama (gizli oklar) ────
+  RAUTH  -[hidden]right- RCONT
+  REVT   -[hidden]right- RMSG
+  RPROF  -[hidden]right- RSYS
+
+  RAUTH  -[hidden]down-  REVT
+  RCONT  -[hidden]down-  RMSG
+  REVT   -[hidden]down-  RPROF
+  RMSG   -[hidden]down-  RSYS
+}
+
+' ═══════════════════════════════
+'  GUEST  bağlantıları
+' ═══════════════════════════════
+Guest --> UC1
+Guest --> UC2
+
+' ═══════════════════════════════
+'  MEMBER  bağlantıları
+' ═══════════════════════════════
+Member --> UC3
+Member --> UC4
+Member --> UC5
+Member --> UC6
+Member --> UC7
+Member --> UC8
+Member --> UC10
+Member --> UC11
+Member --> UC13
+Member --> UC14
+Member --> UC15
+Member --> UC16
+Member --> UC17
+
+' ═══════════════════════════════
+'  GM  bağlantıları
+' ═══════════════════════════════
+GM --> UC12
+
+' ═══════════════════════════════
+'  SYSTEM  bağlantıları
+' ═══════════════════════════════
+System --> UC18
+System --> UC19
+
+' ═══════════════════════════════
+'  INCLUDE / EXTEND
+' ═══════════════════════════════
+UC8  .> UC7  : <<include>>
+UC8  .> UC9  : <<extend>>\n(if full)
+UC13 .> UC18 : <<include>>
+UC14 .> UC18 : <<include>>
+UC13 .> UC19 : <<extend>>
+
+@enduml

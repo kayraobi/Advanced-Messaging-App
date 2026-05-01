@@ -1,0 +1,74 @@
+@startuml SD_05_AIModeration
+
+title Scenario 5 — AI Auto-Moderation
+
+skinparam defaultFontName  Arial
+skinparam defaultFontSize  18
+
+skinparam sequence {
+  ArrowColor                  #374151
+  ArrowFontSize               17
+  ArrowFontStyle              bold
+  ActorBorderColor            #2E7D32
+  ActorBackgroundColor        #E8F5E9
+  ActorFontSize               19
+  ActorFontStyle              bold
+  LifeLineBorderColor         #9CA3AF
+  LifeLineBackgroundColor     #F3F4F6
+  ParticipantBorderColor      #4A6CF7
+  ParticipantBackgroundColor  #EEF2FF
+  ParticipantFontSize         18
+  ParticipantFontStyle        bold
+  NoteBackgroundColor         #FEF9C3
+  NoteBorderColor             #F59E0B
+  NoteFontSize                16
+  GroupBorderColor            #9CA3AF
+  GroupBackgroundColor        #F3F4F6
+  ActivationBorderColor       #4A6CF7
+  ActivationBackgroundColor   #C7D2FE
+}
+skinparam ResponseMessageBelowArrow true
+
+actor      "User"             as User
+boundary   "GlobalChatScreen" as GCS
+control    "Socket.IO Server" as SocketIO
+control    "AI Moderator"     as AI
+entity     "ChatRepository"   as ChatRepo
+entity     "MongoDB"          as DB
+
+User        ->  GCS         ++ : send message
+GCS         ->  SocketIO    ++ : emit send_message
+
+SocketIO    ->  AI          ++ : analyze content
+
+alt Content is safe
+  AI       -->  SocketIO    -- : flagged: false
+  SocketIO ->   ChatRepo    ++ : saveMessage({ hidden: false })
+  ChatRepo ->   DB          ++ : insert Message
+  DB       -->  ChatRepo    -- : saved
+  ChatRepo -->  SocketIO    -- : Message
+  SocketIO -->  GCS            : emit receive_message (visible)
+  GCS      ->   GCS            : render normal message bubble
+  GCS      -->  User        -- : visible message
+
+else Inappropriate content detected
+  AI       -->  SocketIO    -- : flagged: true
+  SocketIO ->   ChatRepo    ++ : saveMessage({ hidden: true })
+  ChatRepo ->   DB          ++ : insert with hidden = true
+  DB       -->  ChatRepo    -- : saved
+  ChatRepo -->  SocketIO    -- : Message (hidden)
+  SocketIO -->  GCS            : emit receive_message\n(hidden: true)
+  GCS      ->   GCS            : render "🛡️ [Message hidden by AI]"
+  note right of GCS
+    hidden=true messages are
+    stored but rendered as
+    italic muted text for
+    all room members.
+  end note
+  GCS      -->  User        -- : muted hidden message
+end
+
+deactivate SocketIO
+deactivate GCS
+
+@enduml

@@ -1,0 +1,55 @@
+@startuml SD_02_Register
+
+title Scenario 2 — Register Flow
+
+skinparam defaultFontName  Arial
+skinparam defaultFontSize  18
+
+skinparam sequence {
+  ArrowColor                  #374151
+  ArrowFontSize               17
+  ArrowFontStyle              bold
+  ActorBorderColor            #2E7D32
+  ActorBackgroundColor        #E8F5E9
+  ActorFontSize               19
+  ActorFontStyle              bold
+  LifeLineBorderColor         #9CA3AF
+  LifeLineBackgroundColor     #F3F4F6
+  ParticipantBorderColor      #4A6CF7
+  ParticipantBackgroundColor  #EEF2FF
+  ParticipantFontSize         18
+  ParticipantFontStyle        bold
+  NoteBackgroundColor         #FEF9C3
+  NoteBorderColor             #F59E0B
+  NoteFontSize                16
+  GroupBorderColor            #9CA3AF
+  GroupBackgroundColor        #F3F4F6
+  ActivationBorderColor       #4A6CF7
+  ActivationBackgroundColor   #C7D2FE
+}
+skinparam ResponseMessageBelowArrow true
+
+actor      "User"        as User
+boundary   "AuthScreen"  as AuthScreen
+control    "AuthService" as AuthSvc
+control    "Backend API" as API
+entity     "MongoDB"     as DB
+
+User       ->  AuthScreen  ++ : enter username, email, phone, password
+User       ->  AuthScreen      : tap CREATE ACCOUNT
+AuthScreen ->  AuthScreen      : validate password == confirmPassword
+
+alt Passwords match
+  AuthScreen ->  AuthSvc   ++ : register({ username, email, password })
+  AuthSvc    ->  API       ++ : POST /api/auth/register
+  API        ->  DB        ++ : insert User (hashed password)
+  DB        -->  API       -- : { _id, username, email }
+  API       -->  AuthSvc   -- : 201 Created
+  AuthSvc   -->  AuthScreen-- : success
+  AuthScreen --> User      -- : onLogin() → HomeScreen
+
+else Passwords mismatch
+  AuthScreen --> User      -- : Alert "Passwords don't match"
+end
+
+@enduml

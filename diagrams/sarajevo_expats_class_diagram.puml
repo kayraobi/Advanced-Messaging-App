@@ -1,0 +1,293 @@
+@startuml SarajevoExpats_ClassDiagram
+
+title SarajevoExpats — Class Diagram
+
+scale 1.5
+
+left to right direction
+
+skinparam defaultFontName  Arial
+skinparam defaultFontSize  16
+
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor       #EEF2FF
+  BorderColor           #4A6CF7
+  ArrowColor            #374151
+  FontName              Arial
+  FontSize              16
+  FontStyle             bold
+  HeaderBackgroundColor #4A6CF7
+  HeaderFontColor       #FFFFFF
+  HeaderFontSize        17
+  HeaderFontStyle       bold
+  AttributeFontSize     15
+  AttributeFontName     Arial
+  StereotypeFontColor   #6366F1
+  StereotypeFontSize    13
+}
+skinparam note {
+  BackgroundColor #FEF9C3
+  BorderColor     #F59E0B
+  FontSize        14
+  FontName        Arial
+}
+skinparam package {
+  FontSize        17
+  FontStyle       bold
+  FontName        Arial
+}
+skinparam arrow {
+  FontSize        14
+  FontName        Arial
+}
+skinparam groupInheritance 2
+skinparam nodesep 60
+skinparam ranksep 70
+skinparam padding 8
+
+' ══════════════════════════════════════════════
+'  DOMAIN — ENTITY LAYER
+' ══════════════════════════════════════════════
+
+package "Domain" #F0F4FF {
+
+  class MongoDocument <<abstract>> {
+    # _id       : string
+    # createdAt : Date
+    # updatedAt : Date
+  }
+
+  class User {
+    + username : string
+    + email    : string
+    + type     : "member" | "GM"
+    --
+    + canCreateEvent() : boolean
+  }
+
+  class Event {
+    + title    : string
+    + date     : string
+    + time     : string
+    + location : string
+    + category : string
+    + image    : string
+    + capacity : number
+    + filled   : number
+    + pinned   : boolean
+    --
+    + isFull()       : boolean
+    + fillPercent()  : number
+  }
+
+  class NewsArticle {
+    + title    : string
+    + snippet  : string
+    + image    : string
+    + featured : boolean
+    + body     : string
+  }
+
+  class ChatRoom {
+    + roomId      : string
+    + type        : "global" | "event" | "dm"
+    + eventId     : string
+    + lastMessage : string
+    + unreadCount : number
+    + memberCount : number
+  }
+
+  class Message {
+    + roomId     : string
+    + senderId   : string
+    + senderName : string
+    + content    : string
+    + timestamp  : Date
+    + hidden     : boolean
+  }
+
+  class Poll {
+    + title      : string
+    + totalVotes : number
+  }
+
+  class PollOption {
+    + label : string
+    + votes : number
+  }
+
+}
+
+' ── Kalıtım ──────────────────────────────────
+MongoDocument <|-- User
+MongoDocument <|-- Event
+MongoDocument <|-- Message
+
+' ── İlişkiler (Domain) ───────────────────────
+User         "0..*" -- "0..*" Event       : attends (RSVP) >
+User         "1"    -- "0..*" Message     : sends >
+Event        "1"    *-- "0..1" ChatRoom   : has group chat
+ChatRoom     "1"    *-- "0..*" Message    : contains
+ChatRoom     "0..1" o-- "0..*" Poll       : has poll
+Poll         "1"    *-- "2..*" PollOption : has options
+User         "0..*" -- "0..*" ChatRoom   : participates in >
+
+' ══════════════════════════════════════════════
+'  DTO LAYER
+' ══════════════════════════════════════════════
+
+package "DTO" #FFF7ED {
+
+  class LoginRequest {
+    + email    : string
+    + password : string
+  }
+
+  class LoginResponse {
+    + token : string
+  }
+
+  class RegisterRequest {
+    + username : string
+    + email    : string
+    + password : string
+  }
+
+  class JwtPayload {
+    + user : User
+    + iat  : number
+    + exp  : number
+  }
+
+}
+
+JwtPayload *-- User : contains
+
+' ══════════════════════════════════════════════
+'  SERVICE LAYER (Frontend)
+' ══════════════════════════════════════════════
+
+package "Services" #F0FFF4 {
+
+  class AuthService {
+    + login(req: LoginRequest)   : Promise<User>
+    + register(req: RegisterRequest) : Promise<void>
+    + getProfile()               : Promise<User>
+  }
+
+  class EventService {
+    + getEvents()                : Promise<Event[]>
+    + getEventById(id: string)   : Promise<Event>
+    + rsvpToEvent(id: string)    : Promise<void>
+    + createEvent(data: Event)   : Promise<Event>
+  }
+
+  class ChatService {
+    + getRooms()                 : Promise<ChatRoom[]>
+    + joinRoom(roomId: string)   : void
+    + sendMessage(roomId, text)  : void
+    + getMessages(roomId)        : Promise<Message[]>
+  }
+
+  class NewsService {
+    + getNews()                  : Promise<NewsArticle[]>
+    + getNewsById(id: string)    : Promise<NewsArticle>
+  }
+
+}
+
+' ── Service bağımlılıkları ────────────────────
+AuthService  ..> LoginRequest   : uses
+AuthService  ..> RegisterRequest: uses
+AuthService  ..> User           : returns
+EventService ..> Event          : returns
+ChatService  ..> ChatRoom       : returns
+ChatService  ..> Message        : returns
+NewsService  ..> NewsArticle    : returns
+
+' ══════════════════════════════════════════════
+'  BACKEND LAYER
+' ══════════════════════════════════════════════
+
+package "Backend" #FFF0F0 {
+
+  class EventController {
+    + getEvents(req, res)    : void
+    + getEventById(req, res) : void
+    + createEvent(req, res)  : void
+    + rsvpToEvent(req, res)  : void
+  }
+
+  class ChatRepository {
+    + getMessagesByRoomId(roomId: string) : Promise<Message[]>
+    + saveMessage(data)                  : Promise<Message>
+  }
+
+  class ChatHandler {
+    + initializeChatSocket(io) : void
+    - onJoinRoom(socket, roomId)  : void
+    - onSendMessage(socket, data) : void
+    - onDisconnect(socket)        : void
+  }
+
+}
+
+' ── Backend bağımlılıkları ────────────────────
+EventController ..> EventService  : calls
+EventController ..> Event         : returns
+ChatHandler     ..> ChatRepository: uses
+ChatRepository  ..> Message       : returns
+
+' ══════════════════════════════════════════════
+'  NOT
+' ══════════════════════════════════════════════
+note bottom of ChatHandler
+  Manages real-time messaging
+  via Socket.IO (WebSocket).
+  AI Moderator sets hidden=true
+  on inappropriate messages.
+end note
+
+note right of User
+  If type == "GM", the user
+  gains permission to create
+  and manage events.
+end note
+
+note top of MongoDocument
+  Abstract base for all
+  MongoDB collections.
+  Provides _id, createdAt
+  and updatedAt fields.
+end note
+
+note bottom of Event
+  When filled >= capacity,
+  new RSVPs are added to
+  a waitlist instead of
+  directly joining.
+end note
+
+note left of JwtPayload
+  Decoded from the JWT token
+  stored on the client.
+  exp field is checked on
+  every authenticated request.
+end note
+
+note right of ChatRoom
+  type = "global" : community chat (1,250 members)
+  type = "event"  : per-event group chat
+  type = "dm"     : private 1-to-1 conversation
+end note
+
+note top of EventController
+  REST endpoints:
+  GET  /api/events
+  GET  /api/events/:id
+  POST /api/events
+  POST /api/events/:id/rsvp
+end note
+
+@enduml

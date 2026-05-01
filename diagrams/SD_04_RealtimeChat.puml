@@ -1,0 +1,71 @@
+@startuml SD_04_RealtimeChat
+
+title Scenario 4 — Real-time Chat via Socket.IO
+
+skinparam defaultFontName  Arial
+skinparam defaultFontSize  18
+
+skinparam sequence {
+  ArrowColor                  #374151
+  ArrowFontSize               17
+  ArrowFontStyle              bold
+  ActorBorderColor            #2E7D32
+  ActorBackgroundColor        #E8F5E9
+  ActorFontSize               19
+  ActorFontStyle              bold
+  LifeLineBorderColor         #9CA3AF
+  LifeLineBackgroundColor     #F3F4F6
+  ParticipantBorderColor      #4A6CF7
+  ParticipantBackgroundColor  #EEF2FF
+  ParticipantFontSize         18
+  ParticipantFontStyle        bold
+  NoteBackgroundColor         #FEF9C3
+  NoteBorderColor             #F59E0B
+  NoteFontSize                16
+  GroupBorderColor            #9CA3AF
+  GroupBackgroundColor        #F3F4F6
+  ActivationBorderColor       #4A6CF7
+  ActivationBackgroundColor   #C7D2FE
+}
+skinparam ResponseMessageBelowArrow true
+
+actor      "User"              as User
+boundary   "GlobalChatScreen"  as GCS
+control    "ChatService"       as ChatSvc
+control    "Socket.IO Server"  as SocketIO
+entity     "ChatRepository"    as ChatRepo
+entity     "MongoDB"           as DB
+
+User        ->  GCS         ++ : open Global Chat
+GCS         ->  ChatSvc     ++ : joinRoom("global")
+ChatSvc     ->  SocketIO    ++ : emit join_room
+
+SocketIO    ->  ChatRepo    ++ : getMessagesByRoomId("global")
+ChatRepo    ->  DB          ++ : query messages
+DB         -->  ChatRepo    -- : messages[]
+ChatRepo   -->  SocketIO    -- : messages[]
+SocketIO   -->  GCS            : emit previous_messages
+deactivate ChatSvc
+GCS        -->  User           : render chat history
+
+note over GCS, SocketIO
+  WebSocket connection stays
+  open (persistent lifetime).
+end note
+
+User        ->  GCS            : type message + tap Send
+GCS         ->  ChatSvc     ++ : sendMessage("global", text)
+ChatSvc     ->  SocketIO       : emit send_message\n{ roomId, senderId, content }
+
+SocketIO    ->  ChatRepo    ++ : saveMessage(data)
+ChatRepo    ->  DB          ++ : insert Message document
+DB         -->  ChatRepo    -- : saved Message
+ChatRepo   -->  SocketIO    -- : Message
+
+SocketIO   -->  GCS            : emit receive_message (broadcast)
+deactivate SocketIO
+deactivate ChatSvc
+GCS        ->   GCS            : append message to list
+deactivate GCS
+
+@enduml
