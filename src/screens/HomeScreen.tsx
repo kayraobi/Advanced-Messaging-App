@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import { News } from '../types/news.types';
 import { UINewsArticle } from '../types/ui-news.types';
 import { newsService } from '../services';
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 const toNewsArticle = (newsItem: News): UINewsArticle => {
   const plainContent = newsItem.content.replace(/<[^>]+>/g, '').trim();
@@ -36,7 +36,7 @@ const toNewsArticle = (newsItem: News): UINewsArticle => {
 };
 
 interface HomeScreenProps {
-  onEventPress: (id: string) => void;
+	onEventPress: (id: string) => void;
 }
 
 const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
@@ -51,17 +51,17 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
   const [newsError, setNewsError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  const featured = articles.filter((a) => a.featured);
-  const latest = articles.filter((a) => !a.featured);
+	const featured = articles.filter((a) => a.featured);
+	const latest = articles.filter((a) => !a.featured);
 
-  const next = useCallback(() => {
-    if (featured.length === 0) return;
-    setCurrent((c) => {
-      const nextIndex = (c + 1) % featured.length;
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-      return nextIndex;
-    });
-  }, [featured.length]);
+	const next = useCallback(() => {
+		if (featured.length === 0) return;
+		setCurrent((c) => {
+			const nextIndex = (c + 1) % featured.length;
+			flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+			return nextIndex;
+		});
+	}, [featured.length]);
 
   useEffect(() => {
     const loadNews = async () => {
@@ -78,124 +78,193 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
       }
     };
 
-    loadNews();
-  }, []);
+		loadNews();
+	}, []);
 
-  useEffect(() => {
-    if (featured.length === 0) return;
-    const timer = setInterval(next, 5000);
-    return () => clearInterval(timer);
-  }, [next, featured.length]);
+	useEffect(() => {
+		if (featured.length === 0) return;
+		const timer = setInterval(next, 5000);
+		return () => clearInterval(timer);
+	}, [next, featured.length]);
 
-  useEffect(() => {
-    if (featured.length === 0) {
-      setCurrent(0);
-      return;
-    }
-    if (current >= featured.length) {
-      setCurrent(0);
-    }
-  }, [featured.length, current]);
+	useEffect(() => {
+		if (featured.length === 0) {
+			setCurrent(0);
+			return;
+		}
+		if (current >= featured.length) {
+			setCurrent(0);
+		}
+	}, [featured.length, current]);
 
-  const currentArticle = featured[current];
+	const currentArticle = featured[current];
 
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Search Bar */}
-      <View style={[styles.searchWrap]}>
-        <View style={[styles.searchBox, { backgroundColor: colors.muted }]}>
-          <Ionicons name="search-outline" size={16} color={colors.mutedForeground} />
-          <TextInput
-            placeholder="Search news, events, places…"
-            placeholderTextColor={colors.mutedForeground}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={[styles.searchInput, { color: colors.foreground }]}
-          />
-        </View>
-      </View>
+	return (
+		<ScrollView
+			style={{ flex: 1, backgroundColor: colors.background }}
+			showsVerticalScrollIndicator={false}
+		>
+			{/* Search Bar */}
+			<View style={[styles.searchWrap]}>
+				<View style={[styles.searchBox, { backgroundColor: colors.muted }]}>
+					<Ionicons
+						name="search-outline"
+						size={16}
+						color={colors.mutedForeground}
+					/>
+					<TextInput
+						placeholder="Search news, events, places…"
+						placeholderTextColor={colors.mutedForeground}
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						style={[styles.searchInput, { color: colors.foreground }]}
+					/>
+				</View>
+			</View>
 
+			{/* Reminder Banner */}
+			{showReminder && (
+				<View
+					style={[styles.reminder, { backgroundColor: colors.primary + "1A" }]}
+				>
+					<Text style={[styles.reminderText, { color: colors.foreground }]}>
+						📅 Tomorrow at 18:00: Pizza Tour
+					</Text>
+					<TouchableOpacity onPress={() => setShowReminder(false)}>
+						<Ionicons name="close" size={16} color={colors.mutedForeground} />
+					</TouchableOpacity>
+				</View>
+			)}
 
+			{/* Featured News Carousel */}
+			<View style={styles.section}>
+				<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+					FEATURED NEWS
+				</Text>
+				{isNewsLoading && (
+					<Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+						Loading news...
+					</Text>
+				)}
+				{!isNewsLoading && newsError && (
+					<Text style={{ color: "#ef4444", fontSize: 13 }}>{newsError}</Text>
+				)}
+				<FlatList
+					ref={flatListRef}
+					data={featured}
+					horizontal
+					pagingEnabled
+					showsHorizontalScrollIndicator={false}
+					onMomentumScrollEnd={(e) => {
+						if (featured.length === 0) return;
+						const denominator = width - 32;
+						if (!denominator) return;
+						const idx = Math.round(e.nativeEvent.contentOffset.x / denominator);
+						if (Number.isNaN(idx)) return;
+						const boundedIdx = Math.min(
+							Math.max(idx, 0),
+							Math.max(featured.length - 1, 0),
+						);
+						setCurrent(boundedIdx);
+					}}
+					keyExtractor={(item) => item.id}
+					renderItem={({ item }) => (
+						<TouchableOpacity
+							style={{ width: width - 32 }}
+							activeOpacity={0.9}
+							onPress={() => {
+								setSelectedArticle(item);
+								setArticleOpen(true);
+							}}
+						>
+							<View style={styles.heroCard}>
+								<Image source={{ uri: item.image }} style={styles.heroImage} />
+								<View style={styles.heroOverlay} />
+								<View style={styles.heroContent}>
+									<Text style={styles.heroTitle} numberOfLines={2}>
+										{item.title}
+									</Text>
+									<Text style={styles.heroSnippet} numberOfLines={2}>
+										{item.snippet}
+									</Text>
+									<View style={styles.heroReadMore}>
+										<Text
+											style={[styles.readMoreText, { color: colors.primary }]}
+										>
+											Read More
+										</Text>
+										<Ionicons
+											name="chevron-forward"
+											size={14}
+											color={colors.primary}
+										/>
+									</View>
+								</View>
+							</View>
+						</TouchableOpacity>
+					)}
+				/>
+				{/* Dots */}
+				<View style={styles.dots}>
+					{featured.map((_, i) => (
+						<TouchableOpacity
+							key={i}
+							onPress={() => {
+								if (featured.length === 0) return;
+								flatListRef.current?.scrollToIndex({
+									index: i,
+									animated: true,
+								});
+								setCurrent(i);
+							}}
+							style={[
+								styles.dot,
+								{
+									backgroundColor:
+										i === current ? colors.primary : "rgba(255,255,255,0.5)",
+								},
+							]}
+						/>
+					))}
+				</View>
+			</View>
 
-      {/* Reminder Banner */}
-      {showReminder && (
-        <View style={[styles.reminder, { backgroundColor: colors.primary + '1A' }]}>
-          <Text style={[styles.reminderText, { color: colors.foreground }]}>
-            📅 Tomorrow at 18:00: Pizza Tour
-          </Text>
-          <TouchableOpacity onPress={() => setShowReminder(false)}>
-            <Ionicons name="close" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        </View>
-      )}
+			{/* Recommended Events */}
+			<View style={styles.section}>
+				<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+					RECOMMENDED FOR YOU ✨
+				</Text>
+				<ScrollView
+					horizontal
+					showsHorizontalScrollIndicator={false}
+					contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+				>
+					{events.slice(0, 3).map((event) => (
+						<View key={event.id} style={{ width: 280 }}>
+							<EventCard event={event} onPress={() => onEventPress(event.id)} />
+						</View>
+					))}
+				</ScrollView>
+			</View>
 
-      {/* Featured News Carousel */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>FEATURED NEWS</Text>
-        {isNewsLoading && (
-          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Loading news...</Text>
-        )}
-        {!isNewsLoading && newsError && (
-          <Text style={{ color: '#ef4444', fontSize: 13 }}>{newsError}</Text>
-        )}
-        <FlatList
-          ref={flatListRef}
-          data={featured}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => {
-            if (featured.length === 0) return;
-            const denominator = width - 32;
-            if (!denominator) return;
-            const idx = Math.round(e.nativeEvent.contentOffset.x / denominator);
-            if (Number.isNaN(idx)) return;
-            const boundedIdx = Math.min(Math.max(idx, 0), Math.max(featured.length - 1, 0));
-            setCurrent(boundedIdx);
-          }}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={{ width: width - 32 }}
-              activeOpacity={0.9}
-              onPress={() => { setSelectedArticle(item); setArticleOpen(true); }}
-            >
-              <View style={styles.heroCard}>
-                <Image source={{ uri: item.image }} style={styles.heroImage} />
-                <View style={styles.heroOverlay} />
-                <View style={styles.heroContent}>
-                  <Text style={styles.heroTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.heroSnippet} numberOfLines={2}>{item.snippet}</Text>
-                  <View style={styles.heroReadMore}>
-                    <Text style={[styles.readMoreText, { color: colors.primary }]}>Read More</Text>
-                    <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
-        />
-        {/* Dots */}
-        <View style={styles.dots}>
-          {featured.map((_, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => {
-                if (featured.length === 0) return;
-                flatListRef.current?.scrollToIndex({ index: i, animated: true });
-                setCurrent(i);
-              }}
-              style={[
-                styles.dot,
-                { backgroundColor: i === current ? colors.primary : 'rgba(255,255,255,0.5)' },
-              ]}
-            />
-          ))}
-        </View>
-      </View>
+			{/* Latest News */}
+			<View style={[styles.section, { paddingBottom: 24 }]}>
+				<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+					LATEST NEWS
+				</Text>
+				<View style={{ gap: 10 }}>
+					{latest.map((article) => (
+						<NewsCard
+							key={article.id}
+							article={article}
+							onPress={() => {
+								setSelectedArticle(article);
+								setArticleOpen(true);
+							}}
+						/>
+					))}
+				</View>
+			</View>
 
       {/* Recommended Events */}
       <View style={styles.section}>
@@ -263,55 +332,82 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 };
 
 const styles = StyleSheet.create({
-  searchWrap: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 999,
-  },
-  searchInput: { flex: 1, fontSize: 14 },
-  reminder: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  reminderText: { fontSize: 13, fontWeight: '600' },
-  section: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  heroCard: { borderRadius: 18, overflow: 'hidden', position: 'relative' },
-  heroImage: { width: '100%', height: 220 },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  heroContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20 },
-  heroTitle: { color: '#fff', fontWeight: '700', fontSize: 17, lineHeight: 22, marginBottom: 6 },
-  heroSnippet: { color: 'rgba(255,255,255,0.75)', fontSize: 12, lineHeight: 16, marginBottom: 10 },
-  heroReadMore: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  readMoreText: { fontSize: 13, fontWeight: '700' },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  articleModal: { flex: 1 },
-  articleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  articleHeaderTitle: { fontSize: 17, fontWeight: '700' },
-  articleImage: { width: '100%', height: 200, borderRadius: 14, marginBottom: 16 },
-  articleTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
-  articleBody: { fontSize: 14, lineHeight: 22 },
+	searchWrap: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+	searchBox: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+		paddingHorizontal: 14,
+		paddingVertical: 9,
+		borderRadius: 999,
+	},
+	searchInput: { flex: 1, fontSize: 14 },
+	reminder: {
+		marginHorizontal: 16,
+		marginBottom: 8,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+	},
+	reminderText: { fontSize: 13, fontWeight: "600" },
+	section: { paddingHorizontal: 16, paddingTop: 16, gap: 10 },
+	sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1 },
+	heroCard: { borderRadius: 18, overflow: "hidden", position: "relative" },
+	heroImage: { width: "100%", height: 220 },
+	heroOverlay: {
+		...StyleSheet.absoluteFillObject,
+		backgroundColor: "rgba(0,0,0,0.55)",
+	},
+	heroContent: {
+		position: "absolute",
+		bottom: 0,
+		left: 0,
+		right: 0,
+		padding: 20,
+	},
+	heroTitle: {
+		color: "#fff",
+		fontWeight: "700",
+		fontSize: 17,
+		lineHeight: 22,
+		marginBottom: 6,
+	},
+	heroSnippet: {
+		color: "rgba(255,255,255,0.75)",
+		fontSize: 12,
+		lineHeight: 16,
+		marginBottom: 10,
+	},
+	heroReadMore: { flexDirection: "row", alignItems: "center", gap: 2 },
+	readMoreText: { fontSize: 13, fontWeight: "700" },
+	dots: {
+		flexDirection: "row",
+		justifyContent: "center",
+		gap: 6,
+		marginTop: 8,
+	},
+	dot: { width: 8, height: 8, borderRadius: 4 },
+	articleModal: { flex: 1 },
+	articleHeader: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingHorizontal: 16,
+		paddingVertical: 14,
+		borderBottomWidth: 1,
+	},
+	articleHeaderTitle: { fontSize: 17, fontWeight: "700" },
+	articleImage: {
+		width: "100%",
+		height: 200,
+		borderRadius: 14,
+		marginBottom: 16,
+	},
+	articleTitle: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
+	articleBody: { fontSize: 14, lineHeight: 22 },
 });
 
 export default HomeScreen;

@@ -2,9 +2,10 @@ node_modules
 
 # ─── Environment variables — NEVER push these ────────────────
 # Frontend
-.env
-.env.local
-.env.production
+*.env
+*.ios
+
+
 
 # Backend
 backend/.env

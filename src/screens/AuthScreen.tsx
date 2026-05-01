@@ -215,7 +215,7 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
             <View style={s.forgotRow}>
               <Text style={s.forgotText}>Forgot Password?</Text>
             </View>
-            <Text style={s.hint}>Giris test hesabi: admin@sarajevoexpats.com / admin123</Text>
+            <Text style={s.hint}>Test account: admin@sarajevoexpats.com / admin123</Text>
             <TouchableOpacity
               style={[s.primaryBtn, isSubmitting && { opacity: 0.7 }]}
               onPress={handleLogin}
