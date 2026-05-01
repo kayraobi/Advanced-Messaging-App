@@ -1,56 +1,55 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-	View,
-	Text,
-	TextInput,
-	ScrollView,
-	TouchableOpacity,
-	Image,
-	Modal,
-	StyleSheet,
-	Dimensions,
-	FlatList,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "../contexts/ThemeContext";
-import { newsArticles, NewsArticle } from "../data/news";
-import { events } from "../data/events";
-import NewsCard from "../components/NewsCard";
-import EventCard from "../components/EventCard";
-import { News } from "../types/news.types";
-import { newsService } from "../services";
-import { USE_MOCK } from "../services/api";
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Modal,
+  StyleSheet,
+  Dimensions,
+  FlatList,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
+import { events } from '../data/events';
+import NewsCard from '../components/NewsCard';
+import EventCard from '../components/EventCard';
+import { News } from '../types/news.types';
+import { UINewsArticle } from '../types/ui-news.types';
+import { newsService } from '../services';
 
 const { width } = Dimensions.get("window");
 
-const toNewsArticle = (newsItem: News): NewsArticle => ({
-	id: newsItem._id,
-	title: newsItem.title,
-	snippet: newsItem.content.replace(/<[^>]+>/g, "").trim(),
-	date: newsItem.createdAt,
-	image:
-		newsItem.pictures[0] ??
-		"https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80",
-	featured: newsItem.showInSlider,
-});
+const toNewsArticle = (newsItem: News): UINewsArticle => {
+  const plainContent = newsItem.content.replace(/<[^>]+>/g, '').trim();
+  return {
+    id: newsItem._id,
+    title: newsItem.title,
+    snippet: plainContent,
+    content: plainContent,
+    date: newsItem.createdAt,
+    image: newsItem.pictures[0] ?? 'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80',
+    featured: newsItem.showInSlider,
+  };
+};
 
 interface HomeScreenProps {
 	onEventPress: (id: string) => void;
 }
 
 const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
-	const { colors } = useTheme();
-	const [current, setCurrent] = useState(0);
-	const [showReminder, setShowReminder] = useState(true);
-	const [searchQuery, setSearchQuery] = useState("");
-	const [articleOpen, setArticleOpen] = useState(false);
-	const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(
-		null,
-	);
-	const [articles, setArticles] = useState<NewsArticle[]>([]);
-	const [isNewsLoading, setIsNewsLoading] = useState<boolean>(true);
-	const [newsError, setNewsError] = useState<string | null>(null);
-	const flatListRef = useRef<FlatList>(null);
+  const { colors } = useTheme();
+  const [current, setCurrent] = useState(0);
+  const [showReminder, setShowReminder] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [articleOpen, setArticleOpen] = useState(false);
+  const [selectedArticle, setSelectedArticle] = useState<UINewsArticle | null>(null);
+  const [articles, setArticles] = useState<UINewsArticle[]>([]);
+  const [isNewsLoading, setIsNewsLoading] = useState<boolean>(true);
+  const [newsError, setNewsError] = useState<string | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
 	const featured = articles.filter((a) => a.featured);
 	const latest = articles.filter((a) => !a.featured);
@@ -64,22 +63,20 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 		});
 	}, [featured.length]);
 
-	useEffect(() => {
-		const loadNews = async () => {
-			try {
-				setIsNewsLoading(true);
-				setNewsError(null);
-				const apiNews = await newsService.getAll();
-				setArticles(apiNews.map(toNewsArticle));
-			} catch (e) {
-				const message =
-					e instanceof Error ? e.message : "Failed to fetch news.";
-				setNewsError(message);
-				if (USE_MOCK) setArticles(newsArticles);
-			} finally {
-				setIsNewsLoading(false);
-			}
-		};
+  useEffect(() => {
+    const loadNews = async () => {
+      try {
+        setIsNewsLoading(true);
+        setNewsError(null);
+        const apiNews = await newsService.getAll();
+        setArticles(apiNews.map(toNewsArticle));
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Failed to fetch news.';
+        setNewsError(message);
+      } finally {
+        setIsNewsLoading(false);
+      }
+    };
 
 		loadNews();
 	}, []);
@@ -269,72 +266,69 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 				</View>
 			</View>
 
-			{/* Article Modal */}
-			<Modal
-				visible={articleOpen}
-				animationType="slide"
-				presentationStyle="pageSheet"
-				onRequestClose={() => setArticleOpen(false)}
-			>
-				<View
-					style={[styles.articleModal, { backgroundColor: colors.background }]}
-				>
-					<View
-						style={[styles.articleHeader, { borderBottomColor: colors.border }]}
-					>
-						<Text
-							style={[styles.articleHeaderTitle, { color: colors.foreground }]}
-						>
-							Article
-						</Text>
-						<TouchableOpacity onPress={() => setArticleOpen(false)}>
-							<Ionicons name="close" size={24} color={colors.foreground} />
-						</TouchableOpacity>
-					</View>
-					<ScrollView
-						style={{ flex: 1 }}
-						contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-					>
-						{selectedArticle && (
-							<>
-								<Image
-									source={{ uri: selectedArticle.image }}
-									style={styles.articleImage}
-								/>
-								<Text
-									style={[styles.articleTitle, { color: colors.foreground }]}
-								>
-									{selectedArticle.title}
-								</Text>
-								<Text
-									style={[
-										styles.articleBody,
-										{ color: colors.mutedForeground },
-									]}
-								>
-									Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
-									do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-									Ut enim ad minim veniam, quis nostrud exercitation ullamco
-									laboris nisi ut aliquip ex ea commodo consequat.
-								</Text>
-								<Text
-									style={[
-										styles.articleBody,
-										{ color: colors.mutedForeground, marginTop: 12 },
-									]}
-								>
-									Duis aute irure dolor in reprehenderit in voluptate velit esse
-									cillum dolore eu fugiat nulla pariatur. Excepteur sint
-									occaecat cupidatat non proident, sunt in culpa qui officia
-									deserunt mollit anim id est laborum.
-								</Text>
-							</>
-						)}
-					</ScrollView>
-				</View>
-			</Modal>
-		</ScrollView>
-	);
+      {/* Recommended Events */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>RECOMMENDED FOR YOU ✨</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
+          {events.slice(0, 3).map((event) => (
+            <View key={event.id} style={{ width: 280 }}>
+              <EventCard event={event} onPress={() => onEventPress(event.id)} />
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Latest News */}
+      <View style={[styles.section, { paddingBottom: 24 }]}>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>LATEST NEWS</Text>
+        <View style={{ gap: 10 }}>
+          {latest.map((article) => (
+            <NewsCard
+              key={article.id}
+              article={article}
+              onPress={() => { setSelectedArticle(article); setArticleOpen(true); }}
+            />
+          ))}
+        </View>
+      </View>
+
+      {/* Article Modal */}
+      <Modal
+        visible={articleOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setArticleOpen(false)}
+      >
+        <View style={[styles.articleModal, { backgroundColor: colors.background }]}>
+          <View style={[styles.articleHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.articleHeaderTitle, { color: colors.foreground }]}>Article</Text>
+            <TouchableOpacity onPress={() => setArticleOpen(false)}>
+              <Ionicons name="close" size={24} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            {selectedArticle && (
+              <>
+                <Image source={{ uri: selectedArticle.image }} style={styles.articleImage} />
+                <Text style={[styles.articleTitle, { color: colors.foreground }]}>{selectedArticle.title}</Text>
+                {selectedArticle.content
+                  .split(/\n+/)
+                  .filter(Boolean)
+                  .map((paragraph, index) => (
+                    <Text
+                      key={`${selectedArticle.id}-${index}`}
+                      style={[styles.articleBody, { color: colors.mutedForeground, marginTop: index === 0 ? 0 : 12 }]}
+                    >
+                      {paragraph}
+                    </Text>
+                  ))}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
 };
 
 const styles = StyleSheet.create({
