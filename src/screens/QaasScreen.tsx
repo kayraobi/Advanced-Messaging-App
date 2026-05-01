@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, TextInput,
@@ -18,6 +18,8 @@ const QaasScreen = ({ onBack }: QaasScreenProps) => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const detailReqSeq = useRef(0);
 
   useEffect(() => {
     qaasService.getAll()
@@ -25,6 +27,30 @@ const QaasScreen = ({ onBack }: QaasScreenProps) => {
       .catch((e) => setError(e.message ?? 'Failed to load Q&As.'))
       .finally(() => setLoading(false));
   }, []);
+
+  const toggleQuestion = async (qa: QaA) => {
+    const opening = openId !== qa._id;
+    if (!opening) {
+      detailReqSeq.current += 1;
+      setOpenId(null);
+      setDetailLoadingId(null);
+      return;
+    }
+    setOpenId(qa._id);
+    const seq = ++detailReqSeq.current;
+    setDetailLoadingId(qa._id);
+    try {
+      const fresh = await qaasService.getById(qa._id);
+      if (detailReqSeq.current !== seq) return;
+      setQaas((prev) =>
+        prev.map((q) => (q._id === fresh._id ? { ...q, ...fresh } : q)),
+      );
+    } catch {
+      /* Liste satırındaki metin kalır */
+    } finally {
+      if (detailReqSeq.current === seq) setDetailLoadingId(null);
+    }
+  };
 
   const filtered = qaas.filter((q) =>
     q.question.toLowerCase().includes(search.toLowerCase()) ||
@@ -99,17 +125,21 @@ const QaasScreen = ({ onBack }: QaasScreenProps) => {
                               { borderBottomColor: colors.border },
                               (isOpen || idx === items.length - 1) && { borderBottomWidth: 0 },
                             ]}
-                            onPress={() => setOpenId(isOpen ? null : qa._id)}
+                            onPress={() => toggleQuestion(qa)}
                             activeOpacity={0.7}
                           >
                             <Text style={[styles.question, { color: colors.foreground, flex: 1 }]}>
                               {qa.question}
                             </Text>
-                            <Ionicons
-                              name={isOpen ? 'chevron-up' : 'chevron-down'}
-                              size={18}
-                              color={colors.mutedForeground}
-                            />
+                            {detailLoadingId === qa._id && isOpen ? (
+                              <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 4 }} />
+                            ) : (
+                              <Ionicons
+                                name={isOpen ? 'chevron-up' : 'chevron-down'}
+                                size={18}
+                                color={colors.mutedForeground}
+                              />
+                            )}
                           </TouchableOpacity>
 
                           {isOpen && (

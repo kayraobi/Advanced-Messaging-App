@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
   StyleSheet, TextInput, ActivityIndicator, ScrollView,
@@ -55,6 +55,10 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
 
+  const [reMode, setReMode] = useState<'all' | 'featured'>('all');
+  const [reTypeSlug, setReTypeSlug] = useState<string | null>(null);
+  const [reTypes, setReTypes] = useState<string[]>([]);
+
   const [loading, setLoading] = useState<Record<ExploreTab, boolean>>({
     places: true, realEstate: false, services: false, trips: false,
   });
@@ -64,9 +68,10 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
 
   // Hangi sekmelerin daha önce yüklendiğini takip eden cache seti
   const [loaded, setLoaded] = useState<Set<ExploreTab>>(new Set());
+  /** Places "All" chip / tip filtresinden önceki tam liste ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Place%20Types/get_api_placeTypes__id_) ile chip seçiminde yenilenir) */
+  const placesBaselineRef = useRef<Place[]>([]);
 
   useEffect(() => {
-    // Daha önce yüklendiyse tekrar fetch etme (cache hit)
     if (loaded.has(tab)) return;
 
     const loadTab = async <T,>(
@@ -86,15 +91,46 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
       }
     };
 
-    // Sadece aktif sekmeyi yükle
     switch (tab) {
       case 'places':
-        loadTab('places', placesService.getAll.bind(placesService), setPlaces);
-        // Filtre tipleri places ile birlikte yüklenir
-        placeTypesService.getAll().then(setPlaceTypes).catch(() => {});
-        break;
-      case 'realEstate':
-        loadTab('realEstate', realEstateService.getAll.bind(realEstateService), setRealEstate);
+        setLoading((prev) => ({ ...prev, places: true }));
+        (async () => {
+          try {
+            let flat: Place[] = [];
+            let chips: PlaceType[] = [];
+            try {
+              const grouped = await placeTypesService.getWithPlaces();
+              chips = grouped.map((g) => ({
+                _id: g._id,
+                name: g.name ?? '',
+                icon: g.icon,
+              }));
+              flat = grouped.flatMap((g) =>
+                (Array.isArray(g.places) ? g.places : []).map((p) => ({
+                  ...p,
+                  placeType: { _id: g._id, name: g.name ?? '' },
+                })),
+              );
+            } catch {
+              chips = await placeTypesService.getAll().catch(() => []);
+            }
+            if (flat.length === 0) {
+              flat = await placesService.getAll();
+              if (chips.length === 0) {
+                chips = await placeTypesService.getAll().catch(() => []);
+              }
+            }
+            setPlaceTypes(chips);
+            placesBaselineRef.current = flat;
+            setPlaces(flat);
+            setLoaded((prev) => new Set(prev).add('places'));
+            setErrors((prev) => ({ ...prev, places: null }));
+          } catch (e: any) {
+            setErrors((prev) => ({ ...prev, places: e.message ?? 'Failed to load.' }));
+          } finally {
+            setLoading((prev) => ({ ...prev, places: false }));
+          }
+        })();
         break;
       case 'services':
         loadTab('services', servicesService.getAll.bind(servicesService), setServices);
@@ -103,8 +139,54 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
       case 'trips':
         loadTab('trips', tripsService.getAll.bind(tripsService), setTrips);
         break;
+      default:
+        break;
     }
-  }, [tab]);  // tab değiştiğinde tetiklenir
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab !== 'realEstate') return;
+    let cancelled = false;
+    (async () => {
+      setLoading((prev) => ({ ...prev, realEstate: true }));
+      setErrors((prev) => ({ ...prev, realEstate: null }));
+      try {
+        let data: RealEstate[];
+        if (reMode === 'featured') {
+          data = await realEstateService.getFeatured();
+          if (!cancelled) setReTypes([]);
+        } else if (reTypeSlug) {
+          data = await realEstateService.getByType(reTypeSlug);
+        } else {
+          data = await realEstateService.getAll();
+          if (!cancelled) {
+            const u = new Set<string>();
+            data.forEach((item) => {
+              const t =
+                typeof item.realEstateType === 'string'
+                  ? item.realEstateType
+                  : item.realEstateType?.name ?? item.type;
+              if (t && typeof t === 'string') u.add(t);
+            });
+            setReTypes([...u].sort());
+          }
+        }
+        if (!cancelled) setRealEstate(data);
+      } catch (e: any) {
+        if (!cancelled) {
+          setErrors((prev) => ({
+            ...prev,
+            realEstate: e.message ?? 'Failed to load.',
+          }));
+        }
+      } finally {
+        if (!cancelled) setLoading((prev) => ({ ...prev, realEstate: false }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, reMode, reTypeSlug]);
 
   const dataMap: Record<ExploreTab, any[]> = {
     places: places, realEstate: realEstate, services: services, trips: trips,
@@ -150,7 +232,11 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
     const subtitle = item.address ?? item.location ?? item.destination ?? item.description ?? null;
     const badge = (() => {
       if (tab === 'places') return typeof item.placeType === 'object' ? item.placeType?.name : item.placeType;
-      if (tab === 'realEstate') return typeof item.realEstateType === 'object' ? item.realEstateType?.name : item.type;
+      if (tab === 'realEstate') {
+        return typeof item.realEstateType === 'object'
+          ? item.realEstateType?.name
+          : item.realEstateType ?? item.type;
+      }
       if (tab === 'services') return typeof item.serviceType === 'object' ? item.serviceType?.name : item.serviceType;
       if (tab === 'trips') return item.destination ?? null;
       return null;
@@ -280,7 +366,16 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
                 !active && { borderColor: colors.border, borderWidth: 1 },
                 { backgroundColor: active ? color + '15' : colors.card },
               ]}
-              onPress={() => { setTab(t.key); setSearch(''); setActiveTypeFilter(null); }}
+              onPress={() => {
+                if (tab === 'places' && t.key !== 'places') {
+                  setPlaces(placesBaselineRef.current);
+                }
+                setTab(t.key);
+                setSearch('');
+                setActiveTypeFilter(null);
+                setReMode('all');
+                setReTypeSlug(null);
+              }}
             >
               <Ionicons name={t.icon as any} size={14} color={active ? color : colors.mutedForeground} />
               <Text style={[styles.tabText, { color: active ? color : colors.mutedForeground }]}>
@@ -301,8 +396,82 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
         </View>
       )}
 
+      {/* Real estate: all vs featured + by-type ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/get_api_realEstate_by_type__type_)) */}
+      {tab === 'realEstate' && !loading[tab] && !errors[tab] && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterChips}
+        >
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              reMode === 'all' && !reTypeSlug
+                ? { backgroundColor: accentColor, borderColor: accentColor }
+                : { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={() => {
+              setReMode('all');
+              setReTypeSlug(null);
+            }}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: reMode === 'all' && !reTypeSlug ? '#fff' : colors.mutedForeground },
+              ]}
+            >
+              All listings
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              reMode === 'featured'
+                ? { backgroundColor: accentColor, borderColor: accentColor }
+                : { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={() => {
+              setReMode('featured');
+              setReTypeSlug(null);
+            }}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: reMode === 'featured' ? '#fff' : colors.mutedForeground },
+              ]}
+            >
+              Featured
+            </Text>
+          </TouchableOpacity>
+          {reMode === 'all' &&
+            reTypes.map((slug) => {
+              const active = reTypeSlug === slug;
+              return (
+                <TouchableOpacity
+                  key={slug}
+                  style={[
+                    styles.filterChip,
+                    active
+                      ? { backgroundColor: accentColor, borderColor: accentColor }
+                      : { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
+                  onPress={() => setReTypeSlug(active ? null : slug)}
+                >
+                  <Text
+                    style={[styles.filterChipText, { color: active ? '#fff' : colors.mutedForeground }]}
+                  >
+                    {slug}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+        </ScrollView>
+      )}
+
       {/* Type filter chips — only for places and services */}
-      {activeTypes.length > 0 && !loading[tab] && (
+      {activeTypes.length > 0 && !loading[tab] && tab !== 'realEstate' && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -315,7 +484,12 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
                 ? { backgroundColor: accentColor, borderColor: accentColor }
                 : { backgroundColor: colors.card, borderColor: colors.border },
             ]}
-            onPress={() => setActiveTypeFilter(null)}
+            onPress={() => {
+              setActiveTypeFilter(null);
+              if (tab === 'places') {
+                setPlaces(placesBaselineRef.current);
+              }
+            }}
           >
             <Text style={[styles.filterChipText, { color: !activeTypeFilter ? '#fff' : colors.mutedForeground }]}>
               All
@@ -332,7 +506,35 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
                     ? { backgroundColor: accentColor, borderColor: accentColor }
                     : { backgroundColor: colors.card, borderColor: colors.border },
                 ]}
-                onPress={() => setActiveTypeFilter(active ? null : type._id)}
+                onPress={() => {
+                  if (tab === 'services') {
+                    setActiveTypeFilter(active ? null : type._id);
+                    return;
+                  }
+                  if (tab !== 'places') return;
+                  const nextId = active ? null : type._id;
+                  setActiveTypeFilter(nextId);
+                  if (!nextId) {
+                    setPlaces(placesBaselineRef.current);
+                    return;
+                  }
+                  setLoading((prev) => ({ ...prev, places: true }));
+                  void (async () => {
+                    try {
+                      const pt = await placeTypesService.getById(nextId);
+                      const flat = (Array.isArray(pt.places) ? pt.places : []).map((p) => ({
+                        ...p,
+                        placeType: { _id: pt._id, name: pt.name ?? '' },
+                      }));
+                      setPlaces(flat);
+                    } catch {
+                      setPlaces(placesBaselineRef.current);
+                      setActiveTypeFilter(nextId);
+                    } finally {
+                      setLoading((prev) => ({ ...prev, places: false }));
+                    }
+                  })();
+                }}
               >
                 <Text style={[styles.filterChipText, { color: active ? '#fff' : colors.mutedForeground }]}>
                   {type.name}

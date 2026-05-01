@@ -8,10 +8,16 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  TextInput,
+  FlatList,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { authService } from '../services/authService';
+import { realEstateService } from '../services/realEstateService';
+import type { RealEstate } from '../services/realEstateService';
+import type { User } from '../types/user.types';
 
 const allInterests = ['Sports', 'Culture', 'Food & Drink', 'Tech', 'Networking', 'Music', 'Travel', 'Volunteering'];
 
@@ -20,15 +26,35 @@ interface ProfileScreenProps {
   onSettings: () => void;
   onFaq: () => void;
   onLogout: () => void;
+  /** Opens real-estate detail (`GET /api/realEstate/{id}`) */
+  onRealEstatePress?: (id: string) => void;
 }
 
-const ProfileScreen = ({ onMyEvents, onSettings, onFaq, onLogout }: ProfileScreenProps) => {
+const ProfileScreen = ({
+  onMyEvents,
+  onSettings,
+  onFaq,
+  onLogout,
+  onRealEstatePress,
+}: ProfileScreenProps) => {
   const { colors } = useTheme();
   const [showInterests, setShowInterests] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(['Sports', 'Food & Drink']);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [interestsSaving, setInterestsSaving] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [user, setUser] = useState<{ username?: string; email?: string; type?: string; name?: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
+  const [showListings, setShowListings] = useState(false);
+  const [myListings, setMyListings] = useState<RealEstate[]>([]);
+  const [myListingsLoading, setMyListingsLoading] = useState(false);
+
+  const listingTitle = (r: RealEstate) =>
+    (r.title ?? r.name ?? (r.description ?? r.content ?? '').split('\n')[0]?.trim()) || 'Listing';
+  const listingImage = (r: RealEstate) => r.displayUrl ?? r.pictures?.[0] ?? null;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -43,10 +69,41 @@ const ProfileScreen = ({ onMyEvents, onSettings, onFaq, onLogout }: ProfileScree
     loadUser();
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    setEditName(user.name ?? user.username ?? '');
+    setEditPhone(user.phone ?? '');
+    if (user.interests && user.interests.length > 0) {
+      setSelectedInterests(user.interests);
+    }
+  }, [user]);
+
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) =>
       prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest]
     );
+  };
+
+  const openMyListings = async () => {
+    if (!onRealEstatePress) return;
+    if (!user?._id) {
+      Alert.alert('Sign in required', 'Log in to see your property listings.');
+      return;
+    }
+    setShowListings(true);
+    setMyListingsLoading(true);
+    try {
+      const rows = await realEstateService.getByUserId(user._id);
+      setMyListings(rows);
+    } catch (e) {
+      Alert.alert(
+        'Could not load listings',
+        e instanceof Error ? e.message : 'Try again later.',
+      );
+      setMyListings([]);
+    } finally {
+      setMyListingsLoading(false);
+    }
   };
 
   const menuItems = [
@@ -55,6 +112,15 @@ const ProfileScreen = ({ onMyEvents, onSettings, onFaq, onLogout }: ProfileScree
       label: 'My Events',
       onPress: onMyEvents,
     },
+    ...(onRealEstatePress
+      ? [
+          {
+            icon: 'home-outline' as const,
+            label: 'My listings',
+            onPress: openMyListings,
+          },
+        ]
+      : []),
     {
       icon: 'help-circle-outline' as const,
       label: 'FAQ',
@@ -93,6 +159,20 @@ const ProfileScreen = ({ onMyEvents, onSettings, onFaq, onLogout }: ProfileScree
         {user?.email ? (
           <Text style={[styles.email, { color: colors.mutedForeground }]}>{user.email}</Text>
         ) : null}
+      </View>
+
+      {/* Edit profile */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+        <TouchableOpacity
+          onPress={() => setShowEditProfile(true)}
+          style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <View style={[styles.menuIcon, { backgroundColor: colors.primary + '1A' }]}>
+            <Ionicons name="person-outline" size={20} color={colors.primary} />
+          </View>
+          <Text style={[styles.menuLabel, { color: colors.foreground }]}>Edit profile</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+        </TouchableOpacity>
       </View>
 
       {/* Menu Items */}
@@ -135,6 +215,75 @@ const ProfileScreen = ({ onMyEvents, onSettings, onFaq, onLogout }: ProfileScree
         </TouchableOpacity>
       </View>
 
+      {/* Edit profile modal */}
+      <Modal
+        visible={showEditProfile}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditProfile(false)}
+      >
+        <View style={[styles.modal, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <View>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit profile</Text>
+              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>Update how others see you in the app</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowEditProfile(false)}>
+              <Ionicons name="close" size={24} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.interestsContent}>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Display name</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Your name"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.textField, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
+            />
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Phone</Text>
+            <TextInput
+              value={editPhone}
+              onChangeText={setEditPhone}
+              placeholder="+387 ..."
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="phone-pad"
+              style={[styles.textField, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+              disabled={profileSaving}
+              onPress={async () => {
+                setProfileSaving(true);
+                try {
+                  await authService.updateMe({
+                    name: editName.trim(),
+                    phone: editPhone.trim(),
+                  });
+                  const fresh = await authService.getMe();
+                  if (fresh) setUser(fresh);
+                  Alert.alert('Profile updated');
+                  setShowEditProfile(false);
+                } catch (e) {
+                  Alert.alert(
+                    'Update failed',
+                    e instanceof Error ? e.message : 'PATCH /api/users/me may not be enabled on this server.',
+                  );
+                } finally {
+                  setProfileSaving(false);
+                }
+              }}
+            >
+              {profileSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Interests Modal */}
       <Modal
         visible={showInterests}
@@ -176,14 +325,101 @@ const ProfileScreen = ({ onMyEvents, onSettings, onFaq, onLogout }: ProfileScree
             </View>
             <TouchableOpacity
               style={[styles.saveBtn, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                Alert.alert('Preferences saved!', `${selectedInterests.length} interests selected.`);
-                setShowInterests(false);
+              disabled={interestsSaving}
+              onPress={async () => {
+                setInterestsSaving(true);
+                try {
+                  await authService.updateMyInterests(selectedInterests);
+                  const fresh = await authService.getMe();
+                  if (fresh) setUser(fresh);
+                  Alert.alert('Saved', `${selectedInterests.length} interests synced to your account.`);
+                  setShowInterests(false);
+                } catch (e) {
+                  Alert.alert(
+                    'Could not save interests',
+                    e instanceof Error ? e.message : 'Check your connection or API configuration.',
+                  );
+                } finally {
+                  setInterestsSaving(false);
+                }
               }}
             >
-              <Text style={styles.saveBtnText}>Save Preferences</Text>
+              {interestsSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save Preferences</Text>
+              )}
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* My real-estate listings (`GET /api/realEstate/user/{userId}`) */}
+      <Modal
+        visible={showListings}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowListings(false)}
+      >
+        <View style={[styles.modal, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <View>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>My listings</Text>
+              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
+                Your properties from the server
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowListings(false)}>
+              <Ionicons name="close" size={24} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+          {myListingsLoading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              data={myListings}
+              keyExtractor={(item) => item._id}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
+              ListEmptyComponent={
+                <Text style={{ color: colors.mutedForeground, textAlign: 'center', paddingVertical: 24 }}>
+                  No listings yet.
+                </Text>
+              }
+              renderItem={({ item }) => {
+                const uri = listingImage(item);
+                return (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowListings(false);
+                      onRealEstatePress?.(item._id);
+                    }}
+                    style={[styles.listingRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  >
+                    {uri ? (
+                      <Image source={{ uri }} style={styles.listingThumb} />
+                    ) : (
+                      <View style={[styles.listingThumb, { backgroundColor: colors.muted, justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="home-outline" size={28} color={colors.mutedForeground} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ color: colors.foreground, fontWeight: '700' }} numberOfLines={2}>
+                        {listingTitle(item)}
+                      </Text>
+                      {item.address || item.location ? (
+                        <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={1}>
+                          {item.address ?? item.location}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
         </View>
       </Modal>
 
@@ -274,6 +510,15 @@ const styles = StyleSheet.create({
   interestChipText: { fontSize: 14, fontWeight: '600' },
   saveBtn: { height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  textField: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 16,
+  },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 24 },
   logoutCard: { borderRadius: 20, padding: 24, gap: 12 },
   logoutTitle: { fontSize: 17, fontWeight: '700' },
@@ -297,6 +542,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoutConfirmText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  listingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  listingThumb: { width: 72, height: 72, borderRadius: 10 },
 });
 
 export default ProfileScreen;

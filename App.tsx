@@ -20,6 +20,7 @@ import {
   ChatDetailScreen,
   GlobalChatScreen,
   EventDetailScreen,
+  NewsDetailScreen,
   PlaceDetailScreen,
   RealEstateDetailScreen,
   ServiceDetailScreen,
@@ -35,6 +36,7 @@ const queryClient = new QueryClient();
 type Screen =
   | 'main'
   | 'eventDetail'
+  | 'newsDetail'
   | 'placeDetail'
   | 'realEstateDetail'
   | 'serviceDetail'
@@ -52,6 +54,7 @@ const AppContent = () => {
   const [activeTab, setActiveTab] = useState<TabName>('Home');
   const [currentScreen, setCurrentScreen] = useState<Screen>('main');
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
+  const [currentNewsId, setCurrentNewsId] = useState<string | null>(null);
   const [currentPlaceId, setCurrentPlaceId] = useState<string | null>(null);
   const [currentRealEstateId, setCurrentRealEstateId] = useState<string | null>(null);
   const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
@@ -98,6 +101,13 @@ const AppContent = () => {
         return (
           <EventDetailScreen
             eventId={currentEventId!}
+            onBack={() => setCurrentScreen('main')}
+          />
+        );
+      case 'newsDetail':
+        return (
+          <NewsDetailScreen
+            newsId={currentNewsId!}
             onBack={() => setCurrentScreen('main')}
           />
         );
@@ -162,6 +172,10 @@ const AppContent = () => {
                   setCurrentEventId(id);
                   setCurrentScreen('eventDetail');
                 }}
+                onNewsPress={(id) => {
+                  setCurrentNewsId(id);
+                  setCurrentScreen('newsDetail');
+                }}
               />
             );
           case 'Calendar':
@@ -214,6 +228,10 @@ const AppContent = () => {
                   setIsLoggedIn(false);
                   setActiveTab('Home');
                   setCurrentScreen('main');
+                }}
+                onRealEstatePress={(id) => {
+                  setCurrentRealEstateId(id);
+                  setCurrentScreen('realEstateDetail');
                 }}
               />
             );
