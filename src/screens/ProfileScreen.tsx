@@ -28,6 +28,11 @@ interface ProfileScreenProps {
   onLogout: () => void;
   /** Opens real-estate detail (`GET /api/realEstate/{id}`) */
   onRealEstatePress?: (id: string) => void;
+  onSuggestPlace?: () => void;
+  onPostListing?: () => void;
+  onBusinessPartnership?: () => void;
+  /** Shown only when account type is GM */
+  onGmAdmin?: () => void;
 }
 
 const ProfileScreen = ({
@@ -36,6 +41,10 @@ const ProfileScreen = ({
   onFaq,
   onLogout,
   onRealEstatePress,
+  onSuggestPlace,
+  onPostListing,
+  onBusinessPartnership,
+  onGmAdmin,
 }: ProfileScreenProps) => {
   const { colors } = useTheme();
   const [showInterests, setShowInterests] = useState(false);
@@ -118,6 +127,42 @@ const ProfileScreen = ({
             icon: 'home-outline' as const,
             label: 'My listings',
             onPress: openMyListings,
+          },
+        ]
+      : []),
+    ...(onSuggestPlace
+      ? [
+          {
+            icon: 'location-outline' as const,
+            label: 'Suggest a place',
+            onPress: onSuggestPlace,
+          },
+        ]
+      : []),
+    ...(onPostListing
+      ? [
+          {
+            icon: 'add-circle-outline' as const,
+            label: 'Post a listing',
+            onPress: onPostListing,
+          },
+        ]
+      : []),
+    ...(onBusinessPartnership
+      ? [
+          {
+            icon: 'briefcase-outline' as const,
+            label: 'Business partnership',
+            onPress: onBusinessPartnership,
+          },
+        ]
+      : []),
+    ...(onGmAdmin && user?.type === 'GM'
+      ? [
+          {
+            icon: 'layers-outline' as const,
+            label: 'Admin: roles & sponsors',
+            onPress: onGmAdmin,
           },
         ]
       : []),

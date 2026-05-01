@@ -19,6 +19,8 @@ interface ExploreScreenProps {
   onRealEstatePress: (id: string) => void;
   onServicePress: (id: string) => void;
   onTripPress: (id: string) => void;
+  onSubmitPlace?: () => void;
+  onSubmitRealEstate?: () => void;
 }
 
 const getTitle = (item: any): string =>
@@ -41,7 +43,14 @@ const TAB_COLORS: Record<ExploreTab, string> = {
   trips:      '#0ea5e9',
 };
 
-const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTripPress }: ExploreScreenProps) => {
+const ExploreScreen = ({
+  onPlacePress,
+  onRealEstatePress,
+  onServicePress,
+  onTripPress,
+  onSubmitPlace,
+  onSubmitRealEstate,
+}: ExploreScreenProps) => {
   const { colors } = useTheme();
   const [tab, setTab] = useState<ExploreTab>('places');
   const [search, setSearch] = useState('');
@@ -70,6 +79,7 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
   const [loaded, setLoaded] = useState<Set<ExploreTab>>(new Set());
   /** Places "All" chip / tip filtresinden önceki tam liste ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Place%20Types/get_api_placeTypes__id_) ile chip seçiminde yenilenir) */
   const placesBaselineRef = useRef<Place[]>([]);
+  const servicesBaselineRef = useRef<Service[]>([]);
 
   useEffect(() => {
     if (loaded.has(tab)) return;
@@ -133,8 +143,44 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
         })();
         break;
       case 'services':
-        loadTab('services', servicesService.getAll.bind(servicesService), setServices);
-        serviceTypesService.getAll().then(setServiceTypes).catch(() => {});
+        setLoading((prev) => ({ ...prev, services: true }));
+        (async () => {
+          try {
+            let flat: Service[] = [];
+            let chips: ServiceType[] = [];
+            try {
+              const grouped = await serviceTypesService.getWithServices();
+              chips = grouped.map((g) => ({
+                _id: g._id,
+                name: g.name ?? '',
+                icon: g.icon,
+              }));
+              flat = grouped.flatMap((g) =>
+                (Array.isArray(g.services) ? g.services : []).map((s) => ({
+                  ...s,
+                  serviceType: { _id: g._id, name: g.name ?? '' },
+                })),
+              );
+            } catch {
+              chips = await serviceTypesService.getAll().catch(() => []);
+            }
+            if (flat.length === 0) {
+              flat = await servicesService.getAll();
+              if (chips.length === 0) {
+                chips = await serviceTypesService.getAll().catch(() => []);
+              }
+            }
+            setServiceTypes(chips);
+            servicesBaselineRef.current = flat;
+            setServices(flat);
+            setLoaded((prev) => new Set(prev).add('services'));
+            setErrors((prev) => ({ ...prev, services: null }));
+          } catch (e: any) {
+            setErrors((prev) => ({ ...prev, services: e.message ?? 'Failed to load.' }));
+          } finally {
+            setLoading((prev) => ({ ...prev, services: false }));
+          }
+        })();
         break;
       case 'trips':
         loadTab('trips', tripsService.getAll.bind(tripsService), setTrips);
@@ -370,6 +416,9 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
                 if (tab === 'places' && t.key !== 'places') {
                   setPlaces(placesBaselineRef.current);
                 }
+                if (tab === 'services' && t.key !== 'services') {
+                  setServices(servicesBaselineRef.current);
+                }
                 setTab(t.key);
                 setSearch('');
                 setActiveTypeFilter(null);
@@ -385,6 +434,29 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
           );
         })}
       </View>
+
+      {(tab === 'places' && onSubmitPlace) || (tab === 'realEstate' && onSubmitRealEstate) ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16, paddingBottom: 8 }}>
+          {tab === 'places' && onSubmitPlace ? (
+            <TouchableOpacity
+              onPress={onSubmitPlace}
+              style={[styles.quickLink, { borderColor: TAB_COLORS.places, backgroundColor: TAB_COLORS.places + '12' }]}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={TAB_COLORS.places} />
+              <Text style={[styles.quickLinkText, { color: TAB_COLORS.places }]}>Suggest a place</Text>
+            </TouchableOpacity>
+          ) : null}
+          {tab === 'realEstate' && onSubmitRealEstate ? (
+            <TouchableOpacity
+              onPress={onSubmitRealEstate}
+              style={[styles.quickLink, { borderColor: TAB_COLORS.realEstate, backgroundColor: TAB_COLORS.realEstate + '12' }]}
+            >
+              <Ionicons name="home-outline" size={18} color={TAB_COLORS.realEstate} />
+              <Text style={[styles.quickLinkText, { color: TAB_COLORS.realEstate }]}>Post a listing</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Count */}
       {!loading[tab] && !errors[tab] && (
@@ -489,6 +561,9 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
               if (tab === 'places') {
                 setPlaces(placesBaselineRef.current);
               }
+              if (tab === 'services') {
+                setServices(servicesBaselineRef.current);
+              }
             }}
           >
             <Text style={[styles.filterChipText, { color: !activeTypeFilter ? '#fff' : colors.mutedForeground }]}>
@@ -508,7 +583,28 @@ const ExploreScreen = ({ onPlacePress, onRealEstatePress, onServicePress, onTrip
                 ]}
                 onPress={() => {
                   if (tab === 'services') {
-                    setActiveTypeFilter(active ? null : type._id);
+                    const nextId = active ? null : type._id;
+                    setActiveTypeFilter(nextId);
+                    if (!nextId) {
+                      setServices(servicesBaselineRef.current);
+                      return;
+                    }
+                    setLoading((prev) => ({ ...prev, services: true }));
+                    void (async () => {
+                      try {
+                        const st = await serviceTypesService.getById(nextId);
+                        const flat = (Array.isArray(st.services) ? st.services : []).map((s) => ({
+                          ...s,
+                          serviceType: { _id: st._id, name: st.name ?? '' },
+                        }));
+                        setServices(flat);
+                      } catch {
+                        setServices(servicesBaselineRef.current);
+                        setActiveTypeFilter(nextId);
+                      } finally {
+                        setLoading((prev) => ({ ...prev, services: false }));
+                      }
+                    })();
                     return;
                   }
                   if (tab !== 'places') return;
@@ -621,6 +717,16 @@ const styles = StyleSheet.create({
   filterChips: { paddingHorizontal: 16, paddingBottom: 10, gap: 8, flexDirection: 'row', alignItems: 'center' },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5 },
   filterChipText: { fontSize: 12, fontWeight: '700' },
+  quickLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  quickLinkText: { fontSize: 13, fontWeight: '700' },
 });
 
 export default ExploreScreen;

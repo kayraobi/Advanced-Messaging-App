@@ -29,6 +29,12 @@ import {
   SettingsScreen,
   MyEventsScreen,
   QaasScreen,
+  UserProfileScreen,
+  SubmitPlaceScreen,
+  SubmitRealEstateScreen,
+  SponsorDetailScreen,
+  BusinessPartnershipScreen,
+  GmAdminScreen,
 } from './src/screens';
 
 const queryClient = new QueryClient();
@@ -45,7 +51,13 @@ type Screen =
   | 'globalChat'
   | 'settings'
   | 'myEvents'
-  | 'faq';
+  | 'faq'
+  | 'userProfile'
+  | 'submitPlace'
+  | 'submitRealEstate'
+  | 'sponsorDetail'
+  | 'businessPartnership'
+  | 'gmAdmin';
 
 const AppContent = () => {
   const { colors } = useTheme();
@@ -60,6 +72,10 @@ const AppContent = () => {
   const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [currentProfileUserId, setCurrentProfileUserId] = useState<string | null>(null);
+  const [userProfileSource, setUserProfileSource] = useState<'realEstateDetail' | 'gmAdmin' | null>(null);
+  const [currentSponsorId, setCurrentSponsorId] = useState<string | null>(null);
+  const [sponsorDetailSource, setSponsorDetailSource] = useState<'home' | 'gmAdmin' | null>(null);
   const [loading, setLoading] = useState(false);
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -123,6 +139,69 @@ const AppContent = () => {
           <RealEstateDetailScreen
             listingId={currentRealEstateId!}
             onBack={() => setCurrentScreen('main')}
+            onUserPress={(userId) => {
+              setCurrentProfileUserId(userId);
+              setUserProfileSource('realEstateDetail');
+              setCurrentScreen('userProfile');
+            }}
+          />
+        );
+      case 'userProfile':
+        return (
+          <UserProfileScreen
+            userId={currentProfileUserId!}
+            onBack={() => {
+              const dest =
+                userProfileSource === 'gmAdmin'
+                  ? 'gmAdmin'
+                  : userProfileSource === 'realEstateDetail'
+                    ? 'realEstateDetail'
+                    : 'main';
+              setCurrentScreen(dest);
+              setUserProfileSource(null);
+            }}
+          />
+        );
+      case 'submitPlace':
+        return (
+          <SubmitPlaceScreen
+            onBack={() => setCurrentScreen('main')}
+            onSubmitted={(id) => setCurrentPlaceId(id)}
+          />
+        );
+      case 'submitRealEstate':
+        return (
+          <SubmitRealEstateScreen
+            onBack={() => setCurrentScreen('main')}
+            onSubmitted={(id) => setCurrentRealEstateId(id)}
+          />
+        );
+      case 'sponsorDetail':
+        return (
+          <SponsorDetailScreen
+            sponsorId={currentSponsorId!}
+            onBack={() => {
+              setCurrentScreen(sponsorDetailSource === 'gmAdmin' ? 'gmAdmin' : 'main');
+              setSponsorDetailSource(null);
+            }}
+          />
+        );
+      case 'businessPartnership':
+        return <BusinessPartnershipScreen onBack={() => setCurrentScreen('main')} />;
+      case 'gmAdmin':
+        return (
+          <GmAdminScreen
+            onBack={() => setCurrentScreen('main')}
+            onOpenSponsor={(id) => {
+              setCurrentSponsorId(id);
+              setSponsorDetailSource('gmAdmin');
+              setCurrentScreen('sponsorDetail');
+            }}
+            onOpenUser={(id) => {
+              setCurrentProfileUserId(id);
+              setUserProfileSource('gmAdmin');
+              setCurrentScreen('userProfile');
+            }}
           />
         );
       case 'serviceDetail':
@@ -176,6 +255,11 @@ const AppContent = () => {
                   setCurrentNewsId(id);
                   setCurrentScreen('newsDetail');
                 }}
+                onSponsorPress={(id) => {
+                  setCurrentSponsorId(id);
+                  setSponsorDetailSource('home');
+                  setCurrentScreen('sponsorDetail');
+                }}
               />
             );
           case 'Calendar':
@@ -206,6 +290,8 @@ const AppContent = () => {
                   setCurrentTripId(id);
                   setCurrentScreen('tripDetail');
                 }}
+                onSubmitPlace={() => setCurrentScreen('submitPlace')}
+                onSubmitRealEstate={() => setCurrentScreen('submitRealEstate')}
               />
             );
           case 'Chats':
@@ -233,6 +319,10 @@ const AppContent = () => {
                   setCurrentRealEstateId(id);
                   setCurrentScreen('realEstateDetail');
                 }}
+                onSuggestPlace={() => setCurrentScreen('submitPlace')}
+                onPostListing={() => setCurrentScreen('submitRealEstate')}
+                onBusinessPartnership={() => setCurrentScreen('businessPartnership')}
+                onGmAdmin={() => setCurrentScreen('gmAdmin')}
               />
             );
           default:

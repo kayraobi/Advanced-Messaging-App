@@ -17,6 +17,7 @@ import NewsCard from "../components/NewsCard";
 import { News } from "../types/news.types";
 import { newsService } from "../services";
 import { eventService } from "../services/eventService";
+import { sponsorsService, Sponsor } from "../services/sponsorsService";
 
 const { width } = Dimensions.get("window");
 
@@ -44,9 +45,10 @@ const toNewsArticle = (newsItem: News): NewsArticle => {
 interface HomeScreenProps {
 	onEventPress: (id: string) => void;
 	onNewsPress: (id: string) => void;
+	onSponsorPress?: (id: string) => void;
 }
 
-const HomeScreen = ({ onEventPress, onNewsPress }: HomeScreenProps) => {
+const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenProps) => {
 	const { colors } = useTheme();
 	const [current, setCurrent] = useState(0);
 	const [showReminder, setShowReminder] = useState(true);
@@ -57,7 +59,12 @@ const HomeScreen = ({ onEventPress, onNewsPress }: HomeScreenProps) => {
 	const [newsError, setNewsError] = useState<string | null>(null);
 	const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
 	const [isEventsLoading, setIsEventsLoading] = useState<boolean>(true);
+	const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+	const [isSponsorsLoading, setIsSponsorsLoading] = useState<boolean>(true);
 	const flatListRef = useRef<FlatList>(null);
+
+	const sponsorThumb = (s: Sponsor) =>
+		(s.logo ?? s.displayUrl ?? s.image ?? null) as string | null;
 
 	const next = useCallback(() => {
 		if (featuredNews.length === 0) return;
@@ -123,6 +130,24 @@ const HomeScreen = ({ onEventPress, onNewsPress }: HomeScreenProps) => {
     };
 
     loadAll();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsSponsorsLoading(true);
+      try {
+        const list = await sponsorsService.getAll();
+        if (!cancelled) setSponsors(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setSponsors([]);
+      } finally {
+        if (!cancelled) setIsSponsorsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
 	useEffect(() => {
@@ -373,6 +398,52 @@ const HomeScreen = ({ onEventPress, onNewsPress }: HomeScreenProps) => {
 				)}
 			</View>
 
+			{/* Sponsors — GET /api/sponsors */}
+			{sponsors.length > 0 || isSponsorsLoading ? (
+				<View style={styles.section}>
+					<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+						SPONSORS
+					</Text>
+					{isSponsorsLoading ? (
+						<Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Loading sponsors…</Text>
+					) : (
+						<ScrollView
+							horizontal
+							showsHorizontalScrollIndicator={false}
+							contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+						>
+							{sponsors.map((s) => {
+								const thumb = sponsorThumb(s);
+								const label = (s.name ?? s.title ?? "Sponsor") as string;
+								return (
+									<TouchableOpacity
+										key={s._id}
+										style={[
+											styles.sponsorCard,
+											{ backgroundColor: colors.card, borderColor: colors.border },
+										]}
+										activeOpacity={0.85}
+										onPress={() => onSponsorPress?.(s._id)}
+										disabled={!onSponsorPress}
+									>
+										{thumb ? (
+											<Image source={{ uri: thumb }} style={styles.sponsorLogo} resizeMode="contain" />
+										) : (
+											<View style={[styles.sponsorLogo, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
+												<Ionicons name="ribbon-outline" size={28} color={colors.mutedForeground} />
+											</View>
+										)}
+										<Text style={[styles.sponsorName, { color: colors.foreground }]} numberOfLines={2}>
+											{label}
+										</Text>
+									</TouchableOpacity>
+								);
+							})}
+						</ScrollView>
+					)}
+				</View>
+			) : null}
+
 			{/* Latest News */}
 			<View style={[styles.section, { paddingBottom: 24 }]}>
 				<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
@@ -469,6 +540,16 @@ const styles = StyleSheet.create({
 	},
 	miniEventImage: { width: "100%", height: 140 },
 	miniEventTitle: { fontSize: 14, fontWeight: "700", lineHeight: 20 },
+	sponsorCard: {
+		width: 132,
+		padding: 12,
+		borderRadius: 14,
+		borderWidth: 1,
+		gap: 8,
+		alignItems: "center",
+	},
+	sponsorLogo: { width: "100%", height: 56, borderRadius: 8 },
+	sponsorName: { fontSize: 12, fontWeight: "700", textAlign: "center", lineHeight: 16 },
 });
 
 export default HomeScreen;

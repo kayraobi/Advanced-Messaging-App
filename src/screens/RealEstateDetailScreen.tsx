@@ -21,9 +21,11 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface RealEstateDetailScreenProps {
   listingId: string;
   onBack: () => void;
+  /** Opens profile loaded via GET /api/users/{id} */
+  onUserPress?: (userId: string) => void;
 }
 
-const RealEstateDetailScreen = ({ listingId, onBack }: RealEstateDetailScreenProps) => {
+const RealEstateDetailScreen = ({ listingId, onBack, onUserPress }: RealEstateDetailScreenProps) => {
   const { colors } = useTheme();
   const [listing, setListing] = useState<RealEstate | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,19 @@ const RealEstateDetailScreen = ({ listingId, onBack }: RealEstateDetailScreenPro
     ? listing.realEstateType?.name
     : listing.type ?? listing.realEstateType;
   const price = listing.price ?? listing.priceLabel ?? null;
+
+  const ownerId =
+    listing.user && typeof listing.user === 'object' && '_id' in listing.user
+      ? String((listing.user as { _id: string })._id)
+      : typeof listing.user === 'string'
+        ? listing.user
+        : null;
+  const ownerLabel =
+    listing.user && typeof listing.user === 'object' && 'username' in listing.user
+      ? String((listing.user as { username?: string }).username ?? '').trim()
+      : ownerId
+        ? 'View seller'
+        : null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -136,6 +151,23 @@ const RealEstateDetailScreen = ({ listingId, onBack }: RealEstateDetailScreenPro
                 </View>
               ) : null}
             </View>
+          ) : null}
+
+          {onUserPress && ownerId ? (
+            <TouchableOpacity
+              style={[styles.sellerRow, { backgroundColor: colors.muted }]}
+              onPress={() => onUserPress(ownerId)}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sellerLabel, { color: colors.mutedForeground }]}>Listed by</Text>
+                <Text style={[styles.sellerName, { color: colors.foreground }]}>
+                  {ownerLabel || 'Member'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
           ) : null}
 
           {/* Description */}
@@ -257,6 +289,16 @@ const styles = StyleSheet.create({
   section: { gap: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
   description: { fontSize: 14, lineHeight: 22 },
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 4,
+  },
+  sellerLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sellerName: { fontSize: 16, fontWeight: '700', marginTop: 2 },
   galleryImage: { width: SCREEN_WIDTH - 80, height: 220, borderRadius: 14 },
   previewBg: { flex: 1, backgroundColor: '#000' },
   previewClose: { position: 'absolute', top: 52, right: 20, zIndex: 10, padding: 4 },

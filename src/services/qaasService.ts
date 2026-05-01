@@ -34,4 +34,41 @@ export const qaasService = {
       throw handleError(e);
     }
   },
+
+  /** POST /api/qaas ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/qaas/post_api_qaas)) */
+  async create(body: Record<string, unknown>): Promise<QaA> {
+    try {
+      const res = await api.post<unknown>('/api/qaas', body);
+      const entity = unwrapApiEntity<QaA>(res.data);
+      if (!entity || typeof entity !== 'object' || !('_id' in entity)) {
+        throw new Error('Invalid Q&A response');
+      }
+      return entity as QaA;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** PUT /api/qaas/{id} ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/qaas/put_api_qaas__id_)) */
+  async update(id: string, body: Record<string, unknown>): Promise<QaA> {
+    try {
+      const res = await api.put<unknown>(`/api/qaas/${encodeURIComponent(id)}`, body);
+      const entity = unwrapApiEntity<QaA>(res.data);
+      if (!entity || typeof entity !== 'object' || !('_id' in entity)) {
+        throw new Error('Invalid Q&A response');
+      }
+      return entity as QaA;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** DELETE /api/qaas/{id} ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/qaas/delete_api_qaas__id_)) */
+  async delete(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/qaas/${encodeURIComponent(id)}`);
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
 };

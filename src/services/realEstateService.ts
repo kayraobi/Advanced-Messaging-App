@@ -87,4 +87,81 @@ export const realEstateService = {
       throw handleError(e);
     }
   },
+
+  /** POST /api/realEstate/ — authenticated ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/post_api_realEstate_)) */
+  async submit(body: Record<string, unknown>): Promise<RealEstate> {
+    try {
+      const res = await api.post<unknown>('/api/realEstate/', body);
+      const entity = unwrapApiEntity<RealEstate>(res.data);
+      if (!entity || typeof entity !== 'object' || !('_id' in entity)) {
+        throw new Error('Invalid listing response');
+      }
+      return entity as RealEstate;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** PUT /api/realEstate/{id} ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/put_api_realEstate__id_)) */
+  async update(id: string, body: Record<string, unknown>): Promise<RealEstate> {
+    try {
+      const res = await api.put<unknown>(`/api/realEstate/${encodeURIComponent(id)}`, body);
+      const entity = unwrapApiEntity<RealEstate>(res.data);
+      if (!entity || typeof entity !== 'object' || !('_id' in entity)) {
+        throw new Error('Invalid listing response');
+      }
+      return entity as RealEstate;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** DELETE /api/realEstate/{id} ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/delete_api_realEstate__id_)) */
+  async delete(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/realEstate/${encodeURIComponent(id)}`);
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /**
+   * DELETE /api/realEstate/{id}/images/{imageUrl}
+   * ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/delete_api_realEstate__id__images))
+   */
+  async deleteImage(listingId: string, imageUrl: string): Promise<void> {
+    try {
+      const encoded = encodeURIComponent(imageUrl);
+      await api.delete(`/api/realEstate/${encodeURIComponent(listingId)}/images/${encoded}`);
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** PUT /api/realEstate/{id}/images/reorder ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/put_api_realEstate__id__images_reorder)) */
+  async reorderImages(listingId: string, body: Record<string, unknown>): Promise<void> {
+    try {
+      await api.put(`/api/realEstate/${encodeURIComponent(listingId)}/images/reorder`, body);
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** PUT /api/realEstate/{id}/approve ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/put_api_realEstate__id__approve)) */
+  async approve(id: string, body?: Record<string, unknown>): Promise<void> {
+    try {
+      await api.put(`/api/realEstate/${encodeURIComponent(id)}/approve`, body ?? {});
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** PUT /api/realEstate/{id}/unapprove ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/put_api_realEstate__id__unapprove)) */
+  async unapprove(id: string, body?: Record<string, unknown>): Promise<void> {
+    try {
+      await api.put(`/api/realEstate/${encodeURIComponent(id)}/unapprove`, body ?? {});
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
 };

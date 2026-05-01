@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { tripsService, Trip } from '../services/tripsService';
+import { tripsService, Trip, TripApplication } from '../services/tripsService';
+import { authService } from '../services/authService';
 
 interface TripDetailScreenProps {
   tripId: string;
@@ -17,6 +18,9 @@ const TripDetailScreen = ({ tripId, onBack }: TripDetailScreenProps) => {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [isGm, setIsGm] = useState(false);
+  const [applications, setApplications] = useState<TripApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
 
   useEffect(() => {
     tripsService.getById(tripId)
@@ -24,6 +28,20 @@ const TripDetailScreen = ({ tripId, onBack }: TripDetailScreenProps) => {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [tripId]);
+
+  useEffect(() => {
+    authService.getStoredUser().then((u) => setIsGm(u?.type === 'GM'));
+  }, []);
+
+  useEffect(() => {
+    if (!isGm || !tripId) return;
+    setApplicationsLoading(true);
+    tripsService
+      .getApplications(tripId)
+      .then(setApplications)
+      .catch(() => setApplications([]))
+      .finally(() => setApplicationsLoading(false));
+  }, [isGm, tripId]);
 
   const handleApply = async () => {
     if (!trip) return;
@@ -152,6 +170,35 @@ const TripDetailScreen = ({ tripId, onBack }: TripDetailScreenProps) => {
               <Text style={[styles.description, { color: colors.mutedForeground }]}>
                 {trip.description}
               </Text>
+            </View>
+          ) : null}
+
+          {isGm ? (
+            <View style={[styles.section, { backgroundColor: colors.muted, padding: 14, borderRadius: 14 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+                Applications (GET /api/trips/id/applications)
+              </Text>
+              {applicationsLoading ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
+              ) : applications.length === 0 ? (
+                <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>No applications yet.</Text>
+              ) : (
+                applications.map((app, idx) => {
+                  const u = app.user;
+                  const label =
+                    typeof u === 'object' && u && 'username' in u
+                      ? String((u as { username?: string }).username ?? '?')
+                      : typeof u === 'string'
+                        ? u
+                        : 'Applicant';
+                  return (
+                    <Text key={app._id ?? idx} style={{ color: colors.foreground, marginTop: 6, fontSize: 14 }}>
+                      • {label}
+                      {app.status ? ` — ${app.status}` : ''}
+                    </Text>
+                  );
+                })
+              )}
             </View>
           ) : null}
         </View>
