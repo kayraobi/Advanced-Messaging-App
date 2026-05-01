@@ -3,6 +3,9 @@ export interface User {
   username: string;
   email: string;
   type: string; // "GM" veya başka roller — Ibrahim'den öğrenince genişletiriz
+  name?: string;
+  phone?: string;
+  interests?: string[];
 }
 
 export interface LoginRequest {
@@ -21,6 +24,7 @@ export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
+  phone?: string;
 }
 
 // JWT içindeki payload yapısı

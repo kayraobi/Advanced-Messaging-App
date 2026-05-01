@@ -2,11 +2,10 @@ import React, { useState, useMemo, useEffect } from "react";
 import {
 	View,
 	Text,
-	ScrollView,
+	FlatList,
 	TouchableOpacity,
 	Image,
 	StyleSheet,
-	Modal,
 	ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,94 +53,99 @@ const CalendarScreen = ({ onEventPress }: CalendarScreenProps) => {
 	}
 
 	return (
-		<ScrollView
-			style={{ flex: 1, backgroundColor: colors.background }}
+		<FlatList
+			data={filtered}
+			keyExtractor={(item) => item._id}
 			showsVerticalScrollIndicator={false}
-		>
-			{/* Filters */}
-			<View style={styles.filters}>
-				<TouchableOpacity
-					style={[
-						styles.filterBtn,
-						{ backgroundColor: colors.card, borderColor: colors.border },
-					]}
-				>
-					<Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
-					<Text style={[styles.filterBtnText, { color: fromDate ? colors.foreground : colors.mutedForeground }]}>
-						{fromDate ? format(fromDate, "MMM d") : "From"}
-					</Text>
-				</TouchableOpacity>
+			style={{ flex: 1, backgroundColor: colors.background }}
+			contentContainerStyle={{ paddingBottom: 40 }}
+			initialNumToRender={8}
+			maxToRenderPerBatch={10}
+			windowSize={5}
+			ListHeaderComponent={
+				<>
+					{/* Filters */}
+					<View style={styles.filters}>
+						<TouchableOpacity
+							style={[
+								styles.filterBtn,
+								{ backgroundColor: colors.card, borderColor: colors.border },
+							]}
+						>
+							<Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
+							<Text style={[styles.filterBtnText, { color: fromDate ? colors.foreground : colors.mutedForeground }]}>
+								{fromDate ? format(fromDate, "MMM d") : "From"}
+							</Text>
+						</TouchableOpacity>
 
-				<TouchableOpacity
-					style={[
-						styles.filterBtn,
-						{ backgroundColor: colors.card, borderColor: colors.border },
-					]}
-				>
-					<Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
-					<Text style={[styles.filterBtnText, { color: toDate ? colors.foreground : colors.mutedForeground }]}>
-						{toDate ? format(toDate, "MMM d") : "To"}
-					</Text>
-				</TouchableOpacity>
-			</View>
+						<TouchableOpacity
+							style={[
+								styles.filterBtn,
+								{ backgroundColor: colors.card, borderColor: colors.border },
+							]}
+						>
+							<Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
+							<Text style={[styles.filterBtnText, { color: toDate ? colors.foreground : colors.mutedForeground }]}>
+								{toDate ? format(toDate, "MMM d") : "To"}
+							</Text>
+						</TouchableOpacity>
+					</View>
 
-			<View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
-				<Text style={[styles.count, { color: colors.mutedForeground }]}>
-					<Text style={{ fontWeight: "700", color: colors.foreground }}>
-						{filtered.length}
-					</Text>{" "}
-					{filtered.length === 1 ? "event" : "events"} found
-				</Text>
-			</View>
-
-			<View style={styles.list}>
-				{filtered.length === 0 ? (
-					<View style={styles.empty}>
-						<Ionicons name="calendar-outline" size={40} color={colors.primary} />
-						<Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-							No events match your filters.
+					<View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+						<Text style={[styles.count, { color: colors.mutedForeground }]}>
+							<Text style={{ fontWeight: "700", color: colors.foreground }}>
+								{filtered.length}
+							</Text>{" "}
+							{filtered.length === 1 ? "event" : "events"} found
 						</Text>
 					</View>
-				) : (
-					filtered.map((event) => {
-						const title = event.content?.split("\n")[0] ?? "Event";
-						return (
-							<TouchableOpacity
-								key={event._id}
-								onPress={() => onEventPress(event._id)}
-								style={[
-									styles.eventCard,
-									{ backgroundColor: colors.card, borderColor: colors.border },
-								]}
-								activeOpacity={0.85}
+				</>
+			}
+			ListEmptyComponent={
+				<View style={styles.empty}>
+					<Ionicons name="calendar-outline" size={40} color={colors.primary} />
+					<Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+						No events match your filters.
+					</Text>
+				</View>
+			}
+			renderItem={({ item: event }) => {
+				const title = event.content?.split("\n")[0] ?? "Event";
+				return (
+					<TouchableOpacity
+						key={event._id}
+						onPress={() => onEventPress(event._id)}
+						style={[
+							styles.eventCard,
+							{ backgroundColor: colors.card, borderColor: colors.border },
+						]}
+						activeOpacity={0.85}
+					>
+						{event.displayUrl ? (
+							<Image source={{ uri: event.displayUrl }} style={styles.eventImage} />
+						) : (
+							<View style={[styles.eventImage, { backgroundColor: colors.muted, justifyContent: "center", alignItems: "center" }]}>
+								<Ionicons name="calendar-outline" size={40} color={colors.mutedForeground} />
+							</View>
+						)}
+						<View style={styles.eventBody}>
+							<Text
+								style={[styles.eventTitle, { color: colors.foreground }]}
+								numberOfLines={2}
 							>
-								{event.displayUrl ? (
-									<Image source={{ uri: event.displayUrl }} style={styles.eventImage} />
-								) : (
-									<View style={[styles.eventImage, { backgroundColor: colors.muted, justifyContent: "center", alignItems: "center" }]}>
-										<Ionicons name="calendar-outline" size={40} color={colors.mutedForeground} />
-									</View>
-								)}
-								<View style={styles.eventBody}>
-									<Text
-										style={[styles.eventTitle, { color: colors.foreground }]}
-										numberOfLines={2}
-									>
-										{title}
-									</Text>
-									<View style={styles.metaRow}>
-										<Ionicons name="calendar-outline" size={12} color={colors.mutedForeground} />
-										<Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-											{event.date}
-										</Text>
-									</View>
-								</View>
-							</TouchableOpacity>
-						);
-					})
-				)}
-			</View>
-		</ScrollView>
+								{title}
+							</Text>
+							<View style={styles.metaRow}>
+								<Ionicons name="calendar-outline" size={12} color={colors.mutedForeground} />
+								<Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+									{event.date}
+								</Text>
+							</View>
+						</View>
+					</TouchableOpacity>
+				);
+			}}
+		/>
 	);
 };
 

@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
-type TabName = 'Home' | 'Calendar' | 'Chats' | 'Profile';
+export type TabName = 'Home' | 'Calendar' | 'Explore' | 'Chats' | 'Profile';
 
 interface BottomNavProps {
   activeTab: TabName;
@@ -11,10 +11,11 @@ interface BottomNavProps {
 }
 
 const tabs: { label: TabName; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap }[] = [
-  { label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-  { label: 'Calendar', icon: 'calendar-outline', activeIcon: 'calendar' },
-  { label: 'Chats', icon: 'chatbubble-outline', activeIcon: 'chatbubble' },
-  { label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
+  { label: 'Home',     icon: 'home-outline',     activeIcon: 'home' },
+  { label: 'Calendar', icon: 'calendar-outline',  activeIcon: 'calendar' },
+  { label: 'Explore',  icon: 'compass-outline',   activeIcon: 'compass' },
+  { label: 'Chats',    icon: 'chatbubble-outline', activeIcon: 'chatbubble' },
+  { label: 'Profile',  icon: 'person-outline',    activeIcon: 'person' },
 ];
 
 const BottomNav = ({ activeTab, onNavigate }: BottomNavProps) => {
@@ -35,12 +36,7 @@ const BottomNav = ({ activeTab, onNavigate }: BottomNavProps) => {
               size={22}
               color={active ? colors.primary : colors.mutedForeground}
             />
-            <Text
-              style={[
-                styles.label,
-                { color: active ? colors.primary : colors.mutedForeground },
-              ]}
-            >
+            <Text style={[styles.label, { color: active ? colors.primary : colors.mutedForeground }]}>
               {tab.label}
             </Text>
           </TouchableOpacity>

@@ -1,0 +1,36 @@
+export const REAL_ESTATE_SEED = [
+	{
+		_id: 're_centar_apt',
+		title: 'Modern 2BR near SCC',
+		description: 'Bright apartment, balcony, fiber internet.',
+		displayUrl:
+			'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80',
+		price: 950,
+		priceLabel: '€950 / mo',
+		address: 'Maršala Tita, Sarajevo',
+		area: 72,
+		rooms: 2,
+		bathrooms: 1,
+		featured: true,
+		approved: true,
+		realEstateType: { _id: 'ret_rent', name: 'Rent' },
+		createdAt: '2026-03-01T12:00:00.000Z',
+	},
+	{
+		_id: 're_ilidza_house',
+		title: 'Family house Ilidža',
+		description: 'Garden, parking, quiet street.',
+		displayUrl:
+			'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=900&q=80',
+		price: 285000,
+		priceLabel: '€285,000',
+		address: 'Ilidža, Sarajevo',
+		area: 160,
+		rooms: 4,
+		bathrooms: 2,
+		featured: false,
+		approved: true,
+		realEstateType: { _id: 'ret_sale', name: 'Sale' },
+		createdAt: '2026-03-15T12:00:00.000Z',
+	},
+];

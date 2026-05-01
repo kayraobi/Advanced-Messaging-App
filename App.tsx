@@ -1,45 +1,81 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, StatusBar, Platform } from 'react-native';
+import React, { useState, useCallback, useRef, Suspense } from 'react';
+import { View, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 
 import AppHeader from './src/components/AppHeader';
 import LoadingOverlay from './src/components/LoadingOverlay';
-import BottomNav from './src/components/BottomNav';
+import BottomNav, { TabName } from './src/components/BottomNav';
 
-import SplashScreen from './src/screens/SplashScreen';
-import AuthScreen from './src/screens/AuthScreen';
-import HomeScreen from './src/screens/HomeScreen';
-import CalendarScreen from './src/screens/CalendarScreen';
-import ChatsScreen from './src/screens/ChatsScreen';
-import ChatDetailScreen from './src/screens/ChatDetailScreen';
-import GlobalChatScreen from './src/screens/GlobalChatScreen';
-import EventDetailScreen from './src/screens/EventDetailScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
-import MyEventsScreen from './src/screens/MyEventsScreen';
+// Tüm ekranlar merkezi lazy registry'den geliyor (src/screens/index.ts)
+// Lazy/statik ayrımı orada yönetilir — App.tsx bu detayı bilmez
+import {
+  SplashScreen,
+  AuthScreen,
+  HomeScreen,
+  CalendarScreen,
+  ExploreScreen,
+  ChatsScreen,
+  ChatDetailScreen,
+  GlobalChatScreen,
+  EventDetailScreen,
+  NewsDetailScreen,
+  PlaceDetailScreen,
+  RealEstateDetailScreen,
+  ServiceDetailScreen,
+  TripDetailScreen,
+  ProfileScreen,
+  SettingsScreen,
+  MyEventsScreen,
+  QaasScreen,
+  UserProfileScreen,
+  SubmitPlaceScreen,
+  SubmitRealEstateScreen,
+  SponsorDetailScreen,
+  BusinessPartnershipScreen,
+  GmAdminScreen,
+} from './src/screens';
 
 const queryClient = new QueryClient();
-
-type Tab = 'Home' | 'Calendar' | 'Chats' | 'Profile';
 
 type Screen =
   | 'main'
   | 'eventDetail'
+  | 'newsDetail'
+  | 'placeDetail'
+  | 'realEstateDetail'
+  | 'serviceDetail'
+  | 'tripDetail'
   | 'chatDetail'
   | 'globalChat'
   | 'settings'
-  | 'myEvents';
+  | 'myEvents'
+  | 'faq'
+  | 'userProfile'
+  | 'submitPlace'
+  | 'submitRealEstate'
+  | 'sponsorDetail'
+  | 'businessPartnership'
+  | 'gmAdmin';
 
 const AppContent = () => {
-  const { colors, theme } = useTheme();
+  const { colors } = useTheme();
   const [showSplash, setShowSplash] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('Home');
+  const [activeTab, setActiveTab] = useState<TabName>('Home');
   const [currentScreen, setCurrentScreen] = useState<Screen>('main');
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
+  const [currentNewsId, setCurrentNewsId] = useState<string | null>(null);
+  const [currentPlaceId, setCurrentPlaceId] = useState<string | null>(null);
+  const [currentRealEstateId, setCurrentRealEstateId] = useState<string | null>(null);
+  const [currentServiceId, setCurrentServiceId] = useState<string | null>(null);
+  const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [currentProfileUserId, setCurrentProfileUserId] = useState<string | null>(null);
+  const [userProfileSource, setUserProfileSource] = useState<'realEstateDetail' | 'gmAdmin' | null>(null);
+  const [currentSponsorId, setCurrentSponsorId] = useState<string | null>(null);
+  const [sponsorDetailSource, setSponsorDetailSource] = useState<'home' | 'gmAdmin' | null>(null);
   const [loading, setLoading] = useState(false);
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -72,8 +108,7 @@ const AppContent = () => {
     );
   }
 
-  const showHeader =
-    currentScreen === 'main' || currentScreen === 'eventDetail';
+  const showHeader = currentScreen === 'main' || currentScreen === 'eventDetail';
   const showNav = currentScreen === 'main';
 
   const renderScreen = () => {
@@ -85,6 +120,104 @@ const AppContent = () => {
             onBack={() => setCurrentScreen('main')}
           />
         );
+      case 'newsDetail':
+        return (
+          <NewsDetailScreen
+            newsId={currentNewsId!}
+            onBack={() => setCurrentScreen('main')}
+          />
+        );
+      case 'placeDetail':
+        return (
+          <PlaceDetailScreen
+            placeId={currentPlaceId!}
+            onBack={() => setCurrentScreen('main')}
+          />
+        );
+      case 'realEstateDetail':
+        return (
+          <RealEstateDetailScreen
+            listingId={currentRealEstateId!}
+            onBack={() => setCurrentScreen('main')}
+            onUserPress={(userId) => {
+              setCurrentProfileUserId(userId);
+              setUserProfileSource('realEstateDetail');
+              setCurrentScreen('userProfile');
+            }}
+          />
+        );
+      case 'userProfile':
+        return (
+          <UserProfileScreen
+            userId={currentProfileUserId!}
+            onBack={() => {
+              const dest =
+                userProfileSource === 'gmAdmin'
+                  ? 'gmAdmin'
+                  : userProfileSource === 'realEstateDetail'
+                    ? 'realEstateDetail'
+                    : 'main';
+              setCurrentScreen(dest);
+              setUserProfileSource(null);
+            }}
+          />
+        );
+      case 'submitPlace':
+        return (
+          <SubmitPlaceScreen
+            onBack={() => setCurrentScreen('main')}
+            onSubmitted={(id) => setCurrentPlaceId(id)}
+          />
+        );
+      case 'submitRealEstate':
+        return (
+          <SubmitRealEstateScreen
+            onBack={() => setCurrentScreen('main')}
+            onSubmitted={(id) => setCurrentRealEstateId(id)}
+          />
+        );
+      case 'sponsorDetail':
+        return (
+          <SponsorDetailScreen
+            sponsorId={currentSponsorId!}
+            onBack={() => {
+              setCurrentScreen(sponsorDetailSource === 'gmAdmin' ? 'gmAdmin' : 'main');
+              setSponsorDetailSource(null);
+            }}
+          />
+        );
+      case 'businessPartnership':
+        return <BusinessPartnershipScreen onBack={() => setCurrentScreen('main')} />;
+      case 'gmAdmin':
+        return (
+          <GmAdminScreen
+            onBack={() => setCurrentScreen('main')}
+            onOpenSponsor={(id) => {
+              setCurrentSponsorId(id);
+              setSponsorDetailSource('gmAdmin');
+              setCurrentScreen('sponsorDetail');
+            }}
+            onOpenUser={(id) => {
+              setCurrentProfileUserId(id);
+              setUserProfileSource('gmAdmin');
+              setCurrentScreen('userProfile');
+            }}
+          />
+        );
+      case 'serviceDetail':
+        return (
+          <ServiceDetailScreen
+            serviceId={currentServiceId!}
+            onBack={() => setCurrentScreen('main')}
+          />
+        );
+      case 'tripDetail':
+        return (
+          <TripDetailScreen
+            tripId={currentTripId!}
+            onBack={() => setCurrentScreen('main')}
+          />
+        );
       case 'chatDetail':
         return (
           <ChatDetailScreen
@@ -93,13 +226,9 @@ const AppContent = () => {
           />
         );
       case 'globalChat':
-        return (
-          <GlobalChatScreen onBack={() => setCurrentScreen('main')} />
-        );
+        return <GlobalChatScreen onBack={() => setCurrentScreen('main')} />;
       case 'settings':
-        return (
-          <SettingsScreen onBack={() => setCurrentScreen('main')} />
-        );
+        return <SettingsScreen onBack={() => setCurrentScreen('main')} />;
       case 'myEvents':
         return (
           <MyEventsScreen
@@ -110,6 +239,8 @@ const AppContent = () => {
             }}
           />
         );
+      case 'faq':
+        return <QaasScreen onBack={() => setCurrentScreen('main')} />;
       case 'main':
       default:
         switch (activeTab) {
@@ -120,6 +251,15 @@ const AppContent = () => {
                   setCurrentEventId(id);
                   setCurrentScreen('eventDetail');
                 }}
+                onNewsPress={(id) => {
+                  setCurrentNewsId(id);
+                  setCurrentScreen('newsDetail');
+                }}
+                onSponsorPress={(id) => {
+                  setCurrentSponsorId(id);
+                  setSponsorDetailSource('home');
+                  setCurrentScreen('sponsorDetail');
+                }}
               />
             );
           case 'Calendar':
@@ -129,6 +269,29 @@ const AppContent = () => {
                   setCurrentEventId(id);
                   setCurrentScreen('eventDetail');
                 }}
+              />
+            );
+          case 'Explore':
+            return (
+              <ExploreScreen
+                onPlacePress={(id) => {
+                  setCurrentPlaceId(id);
+                  setCurrentScreen('placeDetail');
+                }}
+                onRealEstatePress={(id) => {
+                  setCurrentRealEstateId(id);
+                  setCurrentScreen('realEstateDetail');
+                }}
+                onServicePress={(id) => {
+                  setCurrentServiceId(id);
+                  setCurrentScreen('serviceDetail');
+                }}
+                onTripPress={(id) => {
+                  setCurrentTripId(id);
+                  setCurrentScreen('tripDetail');
+                }}
+                onSubmitPlace={() => setCurrentScreen('submitPlace')}
+                onSubmitRealEstate={() => setCurrentScreen('submitRealEstate')}
               />
             );
           case 'Chats':
@@ -144,17 +307,22 @@ const AppContent = () => {
           case 'Profile':
             return (
               <ProfileScreen
-                onMyEvents={() => {
-                  setCurrentScreen('myEvents');
-                }}
-                onSettings={() => {
-                  setCurrentScreen('settings');
-                }}
+                onMyEvents={() => setCurrentScreen('myEvents')}
+                onSettings={() => setCurrentScreen('settings')}
+                onFaq={() => setCurrentScreen('faq')}
                 onLogout={() => {
                   setIsLoggedIn(false);
                   setActiveTab('Home');
                   setCurrentScreen('main');
                 }}
+                onRealEstatePress={(id) => {
+                  setCurrentRealEstateId(id);
+                  setCurrentScreen('realEstateDetail');
+                }}
+                onSuggestPlace={() => setCurrentScreen('submitPlace')}
+                onPostListing={() => setCurrentScreen('submitRealEstate')}
+                onBusinessPartnership={() => setCurrentScreen('businessPartnership')}
+                onGmAdmin={() => setCurrentScreen('gmAdmin')}
               />
             );
           default:
@@ -165,21 +333,19 @@ const AppContent = () => {
 
   return (
     <>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={colors.primary}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
       <SafeAreaView
         style={{ flex: 1, backgroundColor: colors.background }}
         edges={['top', 'left', 'right']}
       >
         {showHeader && <AppHeader />}
-        <View style={{ flex: 1 }}>{renderScreen()}</View>
+        <LoadingOverlay visible={loading} />
+        {/* Suspense: lazy ekran chunk'ı indirilirken LoadingOverlay gösterilir */}
+        <Suspense fallback={<LoadingOverlay visible />}>
+          <View style={{ flex: 1 }}>{renderScreen()}</View>
+        </Suspense>
         {showNav && (
-          <SafeAreaView
-            edges={['bottom']}
-            style={{ backgroundColor: colors.card }}
-          >
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.card }}>
             <BottomNav
               activeTab={activeTab}
               onNavigate={(tab) => {

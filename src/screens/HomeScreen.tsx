@@ -1,103 +1,170 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Modal,
-  StyleSheet,
-  Dimensions,
-  FlatList,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
-import { events } from '../data/events';
-import NewsCard from '../components/NewsCard';
-import EventCard from '../components/EventCard';
-import { News } from '../types/news.types';
-import { UINewsArticle } from '../types/ui-news.types';
-import { newsService } from '../services';
+	View,
+	Text,
+	TextInput,
+	ScrollView,
+	TouchableOpacity,
+	Image,
+	StyleSheet,
+	Dimensions,
+	FlatList,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
+import type { NewsArticle } from "../data/news";
+import NewsCard from "../components/NewsCard";
+import { News } from "../types/news.types";
+import { newsService } from "../services";
+import { eventService } from "../services/eventService";
+import { sponsorsService, Sponsor } from "../services/sponsorsService";
 
 const { width } = Dimensions.get("window");
 
-const toNewsArticle = (newsItem: News): UINewsArticle => {
-  const plainContent = newsItem.content.replace(/<[^>]+>/g, '').trim();
-  return {
-    id: newsItem._id,
-    title: newsItem.title,
-    snippet: plainContent,
-    content: plainContent,
-    date: newsItem.createdAt,
-    image: newsItem.pictures[0] ?? 'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80',
-    featured: newsItem.showInSlider,
-  };
+const stripNewsHtml = (html: string): string =>
+	html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+const toNewsArticle = (newsItem: News): NewsArticle => {
+	const plain = stripNewsHtml(newsItem.content || "");
+	const snippet =
+		plain.length > 220 ? `${plain.slice(0, 220).trim()}…` : plain;
+	return {
+		id: newsItem._id,
+		title: newsItem.title,
+		snippet: snippet || stripNewsHtml(newsItem.title),
+		content: plain || newsItem.title,
+		date: newsItem.createdAt,
+		image:
+			newsItem.pictures[0] ??
+			"https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80",
+		featured: newsItem.showInSlider,
+		sources: newsItem.sources?.trim() || undefined,
+	};
 };
 
 interface HomeScreenProps {
 	onEventPress: (id: string) => void;
+	onNewsPress: (id: string) => void;
+	onSponsorPress?: (id: string) => void;
 }
 
-const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
-  const { colors } = useTheme();
-  const [current, setCurrent] = useState(0);
-  const [showReminder, setShowReminder] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [articleOpen, setArticleOpen] = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState<UINewsArticle | null>(null);
-  const [articles, setArticles] = useState<UINewsArticle[]>([]);
-  const [isNewsLoading, setIsNewsLoading] = useState<boolean>(true);
-  const [newsError, setNewsError] = useState<string | null>(null);
-  const flatListRef = useRef<FlatList>(null);
+const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenProps) => {
+	const { colors } = useTheme();
+	const [current, setCurrent] = useState(0);
+	const [showReminder, setShowReminder] = useState(true);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
+	const [latestNews, setLatestNews] = useState<NewsArticle[]>([]);
+	const [isNewsLoading, setIsNewsLoading] = useState<boolean>(true);
+	const [newsError, setNewsError] = useState<string | null>(null);
+	const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
+	const [isEventsLoading, setIsEventsLoading] = useState<boolean>(true);
+	const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+	const [isSponsorsLoading, setIsSponsorsLoading] = useState<boolean>(true);
+	const flatListRef = useRef<FlatList>(null);
 
-	const featured = articles.filter((a) => a.featured);
-	const latest = articles.filter((a) => !a.featured);
+	const sponsorThumb = (s: Sponsor) =>
+		(s.logo ?? s.displayUrl ?? s.image ?? null) as string | null;
 
 	const next = useCallback(() => {
-		if (featured.length === 0) return;
+		if (featuredNews.length === 0) return;
 		setCurrent((c) => {
-			const nextIndex = (c + 1) % featured.length;
+			const nextIndex = (c + 1) % featuredNews.length;
 			flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
 			return nextIndex;
 		});
-	}, [featured.length]);
+	}, [featuredNews.length]);
 
+  // News ve Events paralel yükleniyor — birbirini beklemez
   useEffect(() => {
-    const loadNews = async () => {
-      try {
-        setIsNewsLoading(true);
-        setNewsError(null);
-        const apiNews = await newsService.getAll();
-        setArticles(apiNews.map(toNewsArticle));
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'Failed to fetch news.';
-        setNewsError(message);
-      } finally {
-        setIsNewsLoading(false);
+    const loadAll = async () => {
+      setIsNewsLoading(true);
+      setIsEventsLoading(true);
+
+      const [slidesResult, latestResult, eventsResult] = await Promise.allSettled([
+        newsService.getSlides(),
+        newsService.getLatest(),
+        eventService.getFeatured().catch(() => eventService.getAll()),
+      ]);
+
+      const errs: string[] = [];
+      if (slidesResult.status === 'fulfilled') {
+        setFeaturedNews(slidesResult.value.map(toNewsArticle));
+      } else {
+        setFeaturedNews([]);
+        errs.push(
+          slidesResult.reason instanceof Error
+            ? slidesResult.reason.message
+            : 'Featured news unavailable.',
+        );
       }
+      if (latestResult.status === 'fulfilled') {
+        const slideIds =
+          slidesResult.status === 'fulfilled'
+            ? new Set(slidesResult.value.map((n) => n._id))
+            : new Set<string>();
+        setLatestNews(
+          latestResult.value
+            .filter((n) => !slideIds.has(n._id))
+            .map(toNewsArticle),
+        );
+      } else {
+        setLatestNews([]);
+        errs.push(
+          latestResult.reason instanceof Error
+            ? latestResult.reason.message
+            : 'Latest news unavailable.',
+        );
+      }
+      setNewsError(errs.length ? errs.join(' ') : null);
+
+      if (eventsResult.status === 'fulfilled') {
+        const data = eventsResult.value;
+        setFeaturedEvents(Array.isArray(data) ? data.slice(0, 3) : []);
+      } else {
+        setFeaturedEvents([]);
+      }
+
+      setIsNewsLoading(false);
+      setIsEventsLoading(false);
     };
 
-		loadNews();
-	}, []);
+    loadAll();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsSponsorsLoading(true);
+      try {
+        const list = await sponsorsService.getAll();
+        if (!cancelled) setSponsors(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setSponsors([]);
+      } finally {
+        if (!cancelled) setIsSponsorsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
 	useEffect(() => {
-		if (featured.length === 0) return;
+		if (featuredNews.length === 0) return;
 		const timer = setInterval(next, 5000);
 		return () => clearInterval(timer);
-	}, [next, featured.length]);
+	}, [next, featuredNews.length]);
 
 	useEffect(() => {
-		if (featured.length === 0) {
+		if (featuredNews.length === 0) {
 			setCurrent(0);
 			return;
 		}
-		if (current >= featured.length) {
+		if (current >= featuredNews.length) {
 			setCurrent(0);
 		}
-	}, [featured.length, current]);
-
-	const currentArticle = featured[current];
+	}, [featuredNews.length, current]);
 
 	return (
 		<ScrollView
@@ -151,19 +218,19 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 				)}
 				<FlatList
 					ref={flatListRef}
-					data={featured}
+					data={featuredNews}
 					horizontal
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
 					onMomentumScrollEnd={(e) => {
-						if (featured.length === 0) return;
+						if (featuredNews.length === 0) return;
 						const denominator = width - 32;
 						if (!denominator) return;
 						const idx = Math.round(e.nativeEvent.contentOffset.x / denominator);
 						if (Number.isNaN(idx)) return;
 						const boundedIdx = Math.min(
 							Math.max(idx, 0),
-							Math.max(featured.length - 1, 0),
+							Math.max(featuredNews.length - 1, 0),
 						);
 						setCurrent(boundedIdx);
 					}}
@@ -172,10 +239,7 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 						<TouchableOpacity
 							style={{ width: width - 32 }}
 							activeOpacity={0.9}
-							onPress={() => {
-								setSelectedArticle(item);
-								setArticleOpen(true);
-							}}
+							onPress={() => onNewsPress(item.id)}
 						>
 							<View style={styles.heroCard}>
 								<Image source={{ uri: item.image }} style={styles.heroImage} />
@@ -206,11 +270,11 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 				/>
 				{/* Dots */}
 				<View style={styles.dots}>
-					{featured.map((_, i) => (
+					{featuredNews.map((_, i) => (
 						<TouchableOpacity
 							key={i}
 							onPress={() => {
-								if (featured.length === 0) return;
+								if (featuredNews.length === 0) return;
 								flatListRef.current?.scrollToIndex({
 									index: i,
 									animated: true,
@@ -234,101 +298,175 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 				<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
 					RECOMMENDED FOR YOU ✨
 				</Text>
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					contentContainerStyle={{ gap: 12, paddingRight: 16 }}
-				>
-					{events.slice(0, 3).map((event) => (
-						<View key={event.id} style={{ width: 280 }}>
-							<EventCard event={event} onPress={() => onEventPress(event.id)} />
-						</View>
-					))}
-				</ScrollView>
+				{isEventsLoading ? (
+					<Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+						Loading events...
+					</Text>
+				) : (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+					>
+						{featuredEvents.map((event) => {
+							const title =
+								(typeof event.content === "string"
+									? event.content
+									: (event.content ?? [])[0] ?? ""
+								)
+									.split("\n")[0]
+									.trim() || "Event";
+							return (
+								<TouchableOpacity
+									key={event._id}
+									style={{ width: 280 }}
+									activeOpacity={0.85}
+									onPress={() => onEventPress(event._id)}
+								>
+									<View
+										style={[
+											styles.miniEventCard,
+											{
+												backgroundColor: colors.card,
+												borderColor: colors.border,
+											},
+										]}
+									>
+										{event.displayUrl ? (
+											<Image
+												source={{ uri: event.displayUrl }}
+												style={styles.miniEventImage}
+											/>
+										) : (
+											<View
+												style={[
+													styles.miniEventImage,
+													{
+														backgroundColor: colors.muted,
+														alignItems: "center",
+														justifyContent: "center",
+													},
+												]}
+											>
+												<Ionicons
+													name="calendar-outline"
+													size={36}
+													color={colors.mutedForeground}
+												/>
+											</View>
+										)}
+										<View style={{ padding: 12, gap: 6 }}>
+											<Text
+												style={[
+													styles.miniEventTitle,
+													{ color: colors.foreground },
+												]}
+												numberOfLines={2}
+											>
+												{title}
+											</Text>
+											{event.date ? (
+												<View
+													style={{
+														flexDirection: "row",
+														alignItems: "center",
+														gap: 5,
+													}}
+												>
+													<Ionicons
+														name="calendar-outline"
+														size={12}
+														color={colors.primary}
+													/>
+													<Text
+														style={{
+															color: colors.mutedForeground,
+															fontSize: 12,
+														}}
+														numberOfLines={1}
+													>
+														{event.date}
+													</Text>
+												</View>
+											) : null}
+										</View>
+									</View>
+								</TouchableOpacity>
+							);
+						})}
+					</ScrollView>
+				)}
 			</View>
+
+			{/* Sponsors — GET /api/sponsors */}
+			{sponsors.length > 0 || isSponsorsLoading ? (
+				<View style={styles.section}>
+					<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+						SPONSORS
+					</Text>
+					{isSponsorsLoading ? (
+						<Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Loading sponsors…</Text>
+					) : (
+						<ScrollView
+							horizontal
+							showsHorizontalScrollIndicator={false}
+							contentContainerStyle={{ gap: 12, paddingRight: 16 }}
+						>
+							{sponsors.map((s) => {
+								const thumb = sponsorThumb(s);
+								const label = (s.name ?? s.title ?? "Sponsor") as string;
+								return (
+									<TouchableOpacity
+										key={s._id}
+										style={[
+											styles.sponsorCard,
+											{ backgroundColor: colors.card, borderColor: colors.border },
+										]}
+										activeOpacity={0.85}
+										onPress={() => onSponsorPress?.(s._id)}
+										disabled={!onSponsorPress}
+									>
+										{thumb ? (
+											<Image source={{ uri: thumb }} style={styles.sponsorLogo} resizeMode="contain" />
+										) : (
+											<View style={[styles.sponsorLogo, { backgroundColor: colors.muted, alignItems: "center", justifyContent: "center" }]}>
+												<Ionicons name="ribbon-outline" size={28} color={colors.mutedForeground} />
+											</View>
+										)}
+										<Text style={[styles.sponsorName, { color: colors.foreground }]} numberOfLines={2}>
+											{label}
+										</Text>
+									</TouchableOpacity>
+								);
+							})}
+						</ScrollView>
+					)}
+				</View>
+			) : null}
 
 			{/* Latest News */}
 			<View style={[styles.section, { paddingBottom: 24 }]}>
 				<Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
 					LATEST NEWS
 				</Text>
-				<View style={{ gap: 10 }}>
-					{latest.map((article) => (
+				<FlatList
+					data={latestNews}
+					keyExtractor={(item) => item.id}
+					scrollEnabled={false}
+					ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+					initialNumToRender={5}
+					maxToRenderPerBatch={5}
+					windowSize={3}
+					renderItem={({ item: article }) => (
 						<NewsCard
-							key={article.id}
 							article={article}
-							onPress={() => {
-								setSelectedArticle(article);
-								setArticleOpen(true);
-							}}
+							onPress={() => onNewsPress(article.id)}
 						/>
-					))}
-				</View>
+					)}
+				/>
 			</View>
-
-      {/* Recommended Events */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>RECOMMENDED FOR YOU ✨</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }}>
-          {events.slice(0, 3).map((event) => (
-            <View key={event.id} style={{ width: 280 }}>
-              <EventCard event={event} onPress={() => onEventPress(event.id)} />
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Latest News */}
-      <View style={[styles.section, { paddingBottom: 24 }]}>
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>LATEST NEWS</Text>
-        <View style={{ gap: 10 }}>
-          {latest.map((article) => (
-            <NewsCard
-              key={article.id}
-              article={article}
-              onPress={() => { setSelectedArticle(article); setArticleOpen(true); }}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Article Modal */}
-      <Modal
-        visible={articleOpen}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setArticleOpen(false)}
-      >
-        <View style={[styles.articleModal, { backgroundColor: colors.background }]}>
-          <View style={[styles.articleHeader, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.articleHeaderTitle, { color: colors.foreground }]}>Article</Text>
-            <TouchableOpacity onPress={() => setArticleOpen(false)}>
-              <Ionicons name="close" size={24} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-            {selectedArticle && (
-              <>
-                <Image source={{ uri: selectedArticle.image }} style={styles.articleImage} />
-                <Text style={[styles.articleTitle, { color: colors.foreground }]}>{selectedArticle.title}</Text>
-                {selectedArticle.content
-                  .split(/\n+/)
-                  .filter(Boolean)
-                  .map((paragraph, index) => (
-                    <Text
-                      key={`${selectedArticle.id}-${index}`}
-                      style={[styles.articleBody, { color: colors.mutedForeground, marginTop: index === 0 ? 0 : 12 }]}
-                    >
-                      {paragraph}
-                    </Text>
-                  ))}
-              </>
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
-    </ScrollView>
-  );
+		</ScrollView>
+	);
 };
 
 const styles = StyleSheet.create({
@@ -390,24 +528,28 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	dot: { width: 8, height: 8, borderRadius: 4 },
-	articleModal: { flex: 1 },
-	articleHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-		borderBottomWidth: 1,
-	},
-	articleHeaderTitle: { fontSize: 17, fontWeight: "700" },
-	articleImage: {
-		width: "100%",
-		height: 200,
+	miniEventCard: {
 		borderRadius: 14,
-		marginBottom: 16,
+		overflow: "hidden",
+		borderWidth: 1,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.07,
+		shadowRadius: 6,
+		elevation: 3,
 	},
-	articleTitle: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
-	articleBody: { fontSize: 14, lineHeight: 22 },
+	miniEventImage: { width: "100%", height: 140 },
+	miniEventTitle: { fontSize: 14, fontWeight: "700", lineHeight: 20 },
+	sponsorCard: {
+		width: 132,
+		padding: 12,
+		borderRadius: 14,
+		borderWidth: 1,
+		gap: 8,
+		alignItems: "center",
+	},
+	sponsorLogo: { width: "100%", height: 56, borderRadius: 8 },
+	sponsorName: { fontSize: 12, fontWeight: "700", textAlign: "center", lineHeight: 16 },
 });
 
 export default HomeScreen;

@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import type { UINewsArticle } from '../types/ui-news.types';
+import type { NewsArticle } from '../data/news';
 
 interface NewsCardProps {
-  article: UINewsArticle;
+  article: NewsArticle;
   onPress?: () => void;
 }
 
@@ -18,7 +18,11 @@ const NewsCard = ({ article, onPress }: NewsCardProps) => {
       style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
       activeOpacity={0.85}
     >
-      <Image source={{ uri: article.image }} style={styles.image} />
+      <Image
+        source={{ uri: article.image }}
+        style={styles.image}
+        fadeDuration={200}
+      />
       <View style={styles.body}>
         <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
           {article.title}

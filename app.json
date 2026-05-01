@@ -27,6 +27,14 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "scheme": "sarajevoexpats"
+    "scheme": "sarajevoexpats",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Sarajevo Expats to attach photos for places and listings."
+        }
+      ]
+    ]
   }
 }

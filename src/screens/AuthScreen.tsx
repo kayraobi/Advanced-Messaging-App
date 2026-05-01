@@ -58,12 +58,34 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
     }
   };
 
-  const handleRegister = () => {
-    if (registerForm.password !== registerForm.confirmPassword) {
-      Alert.alert("Passwords don't match");
+  const handleRegister = async () => {
+    if (!registerForm.username.trim() || !registerForm.email.trim() || !registerForm.password.trim()) {
+      Alert.alert('Missing Fields', 'Please fill in all required fields.');
       return;
     }
-    onLogin();
+    if (registerForm.password !== registerForm.confirmPassword) {
+      Alert.alert("Passwords don't match", 'Please make sure both passwords are the same.');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      await authService.register({
+        username: registerForm.username.trim(),
+        email: registerForm.email.trim(),
+        password: registerForm.password.trim(),
+        phone: registerForm.phone.trim() || undefined,
+      });
+      // Kayıt sonrası otomatik login
+      await authService.login({
+        email: registerForm.email.trim(),
+        password: registerForm.password.trim(),
+      });
+      onLogin();
+    } catch (error: any) {
+      Alert.alert('Registration Failed', error.message || 'Please check your details and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const s = StyleSheet.create({
@@ -215,7 +237,7 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
             <View style={s.forgotRow}>
               <Text style={s.forgotText}>Forgot Password?</Text>
             </View>
-            <Text style={s.hint}>Test account: admin@sarajevoexpats.com / admin123</Text>
+            <Text style={s.hint}>Test account: test@example.com / test123</Text>
             <TouchableOpacity
               style={[s.primaryBtn, isSubmitting && { opacity: 0.7 }]}
               onPress={handleLogin}
@@ -266,8 +288,14 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
             {renderInput('Confirm Password *', registerForm.confirmPassword, (v) => setRegisterForm({ ...registerForm, confirmPassword: v }), {
               secure: true, show: showConfirm, onToggle: () => setShowConfirm(!showConfirm),
             })}
-            <TouchableOpacity style={s.primaryBtn} onPress={handleRegister}>
-              <Text style={s.primaryBtnText}>CREATE ACCOUNT</Text>
+            <TouchableOpacity
+              style={[s.primaryBtn, isSubmitting && { opacity: 0.7 }]}
+              onPress={handleRegister}
+              disabled={isSubmitting}
+            >
+              <Text style={s.primaryBtnText}>
+                {isSubmitting ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT'}
+              </Text>
             </TouchableOpacity>
             <Text style={s.bottomText}>
               Already have an account?{' '}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,18 +6,11 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { events } from '../data/events';
-
-const chatRooms = [
-  { eventId: '1', lastMessage: "See you all at 6pm! 🏀", time: '2m ago', unread: 3 },
-  { eventId: '3', lastMessage: "I'm bringing Catan tonight!", time: '15m ago', unread: 1 },
-  { eventId: '2', lastMessage: 'Weather looks perfect for Saturday', time: '1h ago', unread: 5 },
-  { eventId: '5', lastMessage: 'Anyone need a ride?', time: '3h ago', unread: 0 },
-  { eventId: '7', lastMessage: "Can't wait for the tasting menu 🍽️", time: '5h ago', unread: 2 },
-];
+import { eventService } from '../services/eventService';
 
 const directMessages = [
   { id: 'dm-1', name: 'Yahia (Admin)', initials: 'YA', lastMessage: 'Welcome to the community! Let me know if you need anything.', time: '1m ago', unread: 1 },
@@ -36,7 +29,15 @@ interface ChatsScreenProps {
 const ChatsScreen = ({ onChatPress, onGlobalChatPress }: ChatsScreenProps) => {
   const { colors } = useTheme();
   const [tab, setTab] = useState<'groups' | 'dms'>('groups');
-  const eventsMap = Object.fromEntries(events.map((e) => [e.id, e]));
+  const [eventList, setEventList] = useState<any[]>([]);
+  const [isEventsLoading, setIsEventsLoading] = useState(true);
+
+  useEffect(() => {
+    eventService.getAll()
+      .then((data) => setEventList(Array.isArray(data) ? data.slice(0, 5) : []))
+      .catch(() => setEventList([]))
+      .finally(() => setIsEventsLoading(false));
+  }, []);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} showsVerticalScrollIndicator={false}>
@@ -87,41 +88,59 @@ const ChatsScreen = ({ onChatPress, onGlobalChatPress }: ChatsScreenProps) => {
 
           {/* Event Chats */}
           <Text style={[styles.groupLabel, { color: colors.mutedForeground }]}>Your Event Chats</Text>
-          <View style={[styles.chatList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {chatRooms.map((room, idx) => {
-              const event = eventsMap[room.eventId];
-              if (!event) return null;
-              return (
-                <TouchableOpacity
-                  key={room.eventId}
-                  onPress={() => onChatPress(room.eventId)}
-                  style={[
-                    styles.chatRow,
-                    { borderBottomColor: colors.border },
-                    idx === chatRooms.length - 1 && { borderBottomWidth: 0 },
-                  ]}
-                >
-                  <Image source={{ uri: event.image }} style={styles.avatar} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.chatName, { color: colors.foreground }]} numberOfLines={1}>
-                      {event.title}
-                    </Text>
-                    <Text style={[styles.chatLast, { color: colors.mutedForeground }]} numberOfLines={1}>
-                      {room.lastMessage}
-                    </Text>
-                  </View>
-                  <View style={styles.chatMeta}>
-                    <Text style={[styles.chatTime, { color: colors.mutedForeground }]}>{room.time}</Text>
-                    {room.unread > 0 && (
-                      <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.unreadText}>{room.unread}</Text>
+          {isEventsLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+          ) : (
+            <View style={[styles.chatList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {eventList.length === 0 ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No event chats yet.</Text>
+                </View>
+              ) : (
+                eventList.map((event, idx) => {
+                  const title =
+                    (typeof event.content === 'string'
+                      ? event.content
+                      : (event.content ?? [])[0] ?? ''
+                    ).split('\n')[0].trim() || 'Event';
+                  return (
+                    <TouchableOpacity
+                      key={event._id}
+                      onPress={() => onChatPress(event._id)}
+                      style={[
+                        styles.chatRow,
+                        { borderBottomColor: colors.border },
+                        idx === eventList.length - 1 && { borderBottomWidth: 0 },
+                      ]}
+                    >
+                      {event.displayUrl ? (
+                        <Image
+                          source={{ uri: event.displayUrl }}
+                          style={styles.avatar}
+                          fadeDuration={200}
+                        />
+                      ) : (
+                        <View style={[styles.avatar, { backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }]}>
+                          <Ionicons name="calendar-outline" size={20} color={colors.mutedForeground} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={[styles.chatName, { color: colors.foreground }]} numberOfLines={1}>
+                          {title}
+                        </Text>
+                        <Text style={[styles.chatLast, { color: colors.mutedForeground }]} numberOfLines={1}>
+                          Chat coming soon...
+                        </Text>
                       </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                      <View style={styles.chatMeta}>
+                        <Text style={[styles.chatTime, { color: colors.mutedForeground }]}>{event.date ?? ''}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </View>
+          )}
         </View>
       ) : (
         <View style={styles.content}>
