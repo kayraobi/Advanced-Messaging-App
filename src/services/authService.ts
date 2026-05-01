@@ -9,6 +9,31 @@ import {
   User,
   JwtPayload,
 } from '../types/user.types';
+import { unwrapApiEntity } from '../utils/apiUnwrap';
+
+/** Maps GET /api/users/me payload to app User (Swagger Users schema). */
+function normalizeUserFromMe(raw: unknown): User | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const id = String(r._id ?? r.id ?? '').trim();
+  if (!id) return null;
+  const email = String(r.email ?? '').trim();
+  const usernameRaw = String(r.username ?? '').trim();
+  const username =
+    usernameRaw || (email.includes('@') ? email.split('@')[0] : email) || 'user';
+  const interestsRaw = r.interests;
+  return {
+    _id: id,
+    username,
+    email,
+    type: String(r.type ?? r.role ?? 'Member'),
+    name: r.name != null ? String(r.name) : undefined,
+    phone: r.phone != null ? String(r.phone) : undefined,
+    interests: Array.isArray(interestsRaw)
+      ? interestsRaw.map((x) => String(x))
+      : undefined,
+  };
+}
 
 const MOCK_USER: User = {
   username: 'admin',
@@ -86,18 +111,33 @@ export const authService = {
       // Token'ı storage'a kaydet
       await AsyncStorage.setItem('auth_token', token);
 
+      try {
+        const me = await authService.getMe();
+        if (me) {
+          await AsyncStorage.setItem('auth_user', JSON.stringify(me));
+          return me;
+        }
+      } catch {
+        /* fall through */
+      }
+
       // Backend mock token JWT olmayabilir; önce decode dene, olmazsa response.user kullan.
       try {
         const decoded = jwtDecode<JwtPayload>(token);
-        await AsyncStorage.setItem('auth_user', JSON.stringify(decoded.user));
-        return decoded.user;
+        const normalized = normalizeUserFromMe(decoded.user);
+        const finalUser = normalized ?? (decoded.user as User);
+        await AsyncStorage.setItem('auth_user', JSON.stringify(finalUser));
+        return finalUser;
       } catch {
-        const fallbackUser: User = {
-          _id: String((user as any)?.id ?? (user as any)?._id ?? '1'),
-          username: user?.username ?? (user as any)?.name ?? 'User',
-          email: normalizedIdentifier,
-          type: user?.type ?? 'GM',
-        };
+        const bodyUser = user as Record<string, unknown> | undefined;
+        const fallbackUser: User =
+          normalizeUserFromMe(bodyUser) ??
+          ({
+            _id: String((user as any)?.id ?? (user as any)?._id ?? '1'),
+            username: user?.username ?? (user as any)?.name ?? 'User',
+            email: normalizedIdentifier,
+            type: user?.type ?? 'GM',
+          } as User);
         await AsyncStorage.setItem('auth_user', JSON.stringify(fallbackUser));
         return fallbackUser;
       }
@@ -160,13 +200,50 @@ export const authService = {
     return user !== null;
   },
 
-  // GET /api/users/me — Giriş yapan kullanıcının profilini getir
+  // GET /api/users/me — Swagger: Users get_api_users_me
   getMe: async (): Promise<User | null> => {
     try {
-      const res = await api.get<any>('/api/users/me');
-      return res.data?.data ?? res.data ?? null;
+      const res = await api.get<unknown>('/api/users/me');
+      const raw = unwrapApiEntity<unknown>(res.data);
+      return normalizeUserFromMe(raw);
     } catch {
       return null;
+    }
+  },
+
+  /**
+   * PATCH /api/users/me — update profile fields (name, phone, username, …).
+   * Backend expects snake_case or camelCase depending on deployment; send camelCase first.
+   */
+  updateMe: async (
+    payload: Partial<Pick<User, 'username' | 'name' | 'phone'>> & Record<string, unknown>,
+  ): Promise<User | null> => {
+    if (USE_MOCK) return null;
+
+    try {
+      await api.patch('/api/users/me', payload);
+      const merged = await authService.getMe();
+      if (merged) {
+        await AsyncStorage.setItem('auth_user', JSON.stringify(merged));
+      }
+      return merged;
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /** POST /api/users/me/interests — persist interest labels. */
+  updateMyInterests: async (interests: string[]): Promise<void> => {
+    if (USE_MOCK) return;
+
+    try {
+      await api.post('/api/users/me/interests', { interests });
+      const merged = await authService.getMe();
+      if (merged) {
+        await AsyncStorage.setItem('auth_user', JSON.stringify(merged));
+      }
+    } catch (e) {
+      throw handleError(e);
     }
   },
 };

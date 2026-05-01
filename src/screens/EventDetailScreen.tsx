@@ -12,10 +12,13 @@ import {
   FlatList,
   Modal,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { eventService } from '../services/eventService';
+import type { Event, EventChildPost } from '../types/event.types';
+import { contentToPlainLines, eventInstagramUrl } from '../utils/eventPresentation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -28,16 +31,22 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
   const { colors } = useTheme();
-  const [event, setEvent] = useState<any>(null);
+  const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const previewRef = useRef<FlatList>(null);
+  const [hasRsvp, setHasRsvp] = useState(false);
+  const [rsvpBusy, setRsvpBusy] = useState(false);
 
   useEffect(() => {
     eventService.getById(eventId)
       .then(setEvent)
       .catch(console.error)
       .finally(() => setLoading(false));
+  }, [eventId]);
+
+  useEffect(() => {
+    eventService.hasLocalRsvp(eventId).then(setHasRsvp);
   }, [eventId]);
 
   if (loading) {
@@ -56,14 +65,48 @@ const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
     );
   }
 
-  const lines = (event.content ?? '').split('\n').filter((l: string) => l.trim());
+  const lines = contentToPlainLines(event.content);
   const title = lines[0] ?? 'Event';
   const description = lines.slice(1).join('\n').trim();
-  const images = (event.childPosts ?? []).filter((p: any) => p.displayUrl);
+  const images = (event.childPosts ?? []).filter(
+    (p): p is EventChildPost & { displayUrl: string } =>
+      typeof p.displayUrl === 'string' && p.displayUrl.length > 0,
+  );
+  const instagramUrl = eventInstagramUrl(event.url);
+
+  const onRsvp = async () => {
+    setRsvpBusy(true);
+    try {
+      await eventService.rsvp(eventId);
+      setHasRsvp(true);
+      Alert.alert("You're in!", 'Find this event under Profile → My Events.');
+    } catch (e) {
+      Alert.alert('RSVP failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setRsvpBusy(false);
+    }
+  };
+
+  const onCancelRsvp = async () => {
+    setRsvpBusy(true);
+    try {
+      await eventService.cancelRsvp(eventId);
+      setHasRsvp(false);
+      Alert.alert('RSVP cancelled');
+    } catch (e) {
+      Alert.alert('Could not cancel', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setRsvpBusy(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      >
 
         {/* Cover Image */}
         <View style={styles.cover}>
@@ -92,10 +135,10 @@ const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
           </View>
 
           {/* Instagram link */}
-          {event.url ? (
+          {instagramUrl ? (
             <TouchableOpacity
               style={[styles.linkBtn, { borderColor: colors.primary + '40' }]}
-              onPress={() => Linking.openURL(event.url)}
+              onPress={() => Linking.openURL(instagramUrl)}
             >
               <Ionicons name="logo-instagram" size={16} color={colors.primary} />
               <Text style={[styles.linkBtnText, { color: colors.primary }]}>View on Instagram</Text>
@@ -180,15 +223,65 @@ const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
           </View>
         </Modal>
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 24 }} />
 
       </ScrollView>
+
+      <View
+        style={[
+          styles.rsvpBar,
+          {
+            borderTopColor: colors.border,
+            backgroundColor: colors.card,
+          },
+        ]}
+      >
+        {hasRsvp ? (
+          <TouchableOpacity
+            style={[styles.rsvpBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
+            onPress={onCancelRsvp}
+            disabled={rsvpBusy}
+          >
+            {rsvpBusy ? (
+              <ActivityIndicator color={colors.foreground} />
+            ) : (
+              <Text style={[styles.rsvpBtnText, { color: colors.foreground }]}>Cancel RSVP</Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.rsvpBtn, { backgroundColor: colors.primary }]}
+            onPress={onRsvp}
+            disabled={rsvpBusy}
+          >
+            {rsvpBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={[styles.rsvpBtnText, { color: '#fff' }]}>Join event</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  rsvpBar: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
+    borderTopWidth: 1,
+  },
+  rsvpBtn: {
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  rsvpBtnText: { fontSize: 16, fontWeight: '700' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   cover: { position: 'relative', height: 260 },
   coverImage: { width: '100%', height: '100%' },

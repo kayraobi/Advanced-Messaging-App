@@ -18,6 +18,7 @@ export const ChatsScreen            = lazy(() => import('./ChatsScreen'));
 export const ChatDetailScreen       = lazy(() => import('./ChatDetailScreen'));
 export const GlobalChatScreen       = lazy(() => import('./GlobalChatScreen'));
 export const EventDetailScreen      = lazy(() => import('./EventDetailScreen'));
+export const NewsDetailScreen       = lazy(() => import('./NewsDetailScreen'));
 export const PlaceDetailScreen      = lazy(() => import('./PlaceDetailScreen'));
 export const RealEstateDetailScreen = lazy(() => import('./RealEstateDetailScreen'));
 export const ServiceDetailScreen    = lazy(() => import('./ServiceDetailScreen'));

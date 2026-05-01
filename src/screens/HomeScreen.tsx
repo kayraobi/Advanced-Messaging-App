@@ -6,64 +6,67 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	Image,
-	Modal,
 	StyleSheet,
 	Dimensions,
 	FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
-import { newsArticles, NewsArticle } from "../data/news";
+import type { NewsArticle } from "../data/news";
 import NewsCard from "../components/NewsCard";
 import { News } from "../types/news.types";
 import { newsService } from "../services";
 import { eventService } from "../services/eventService";
-import { USE_MOCK } from "../services/api";
 
 const { width } = Dimensions.get("window");
 
-const toNewsArticle = (newsItem: News): NewsArticle => ({
-	id: newsItem._id,
-	title: newsItem.title,
-	snippet: newsItem.content.replace(/<[^>]+>/g, "").trim(),
-	date: newsItem.createdAt,
-	image:
-		newsItem.pictures[0] ??
-		"https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80",
-	featured: newsItem.showInSlider,
-});
+const stripNewsHtml = (html: string): string =>
+	html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+const toNewsArticle = (newsItem: News): NewsArticle => {
+	const plain = stripNewsHtml(newsItem.content || "");
+	const snippet =
+		plain.length > 220 ? `${plain.slice(0, 220).trim()}…` : plain;
+	return {
+		id: newsItem._id,
+		title: newsItem.title,
+		snippet: snippet || stripNewsHtml(newsItem.title),
+		content: plain || newsItem.title,
+		date: newsItem.createdAt,
+		image:
+			newsItem.pictures[0] ??
+			"https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800&q=80",
+		featured: newsItem.showInSlider,
+		sources: newsItem.sources?.trim() || undefined,
+	};
+};
 
 interface HomeScreenProps {
 	onEventPress: (id: string) => void;
+	onNewsPress: (id: string) => void;
 }
 
-const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
+const HomeScreen = ({ onEventPress, onNewsPress }: HomeScreenProps) => {
 	const { colors } = useTheme();
 	const [current, setCurrent] = useState(0);
 	const [showReminder, setShowReminder] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [articleOpen, setArticleOpen] = useState(false);
-	const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(
-		null,
-	);
-	const [articles, setArticles] = useState<NewsArticle[]>([]);
+	const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
+	const [latestNews, setLatestNews] = useState<NewsArticle[]>([]);
 	const [isNewsLoading, setIsNewsLoading] = useState<boolean>(true);
 	const [newsError, setNewsError] = useState<string | null>(null);
 	const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
 	const [isEventsLoading, setIsEventsLoading] = useState<boolean>(true);
 	const flatListRef = useRef<FlatList>(null);
 
-	const featured = articles.filter((a) => a.featured);
-	const latest = articles.filter((a) => !a.featured);
-
 	const next = useCallback(() => {
-		if (featured.length === 0) return;
+		if (featuredNews.length === 0) return;
 		setCurrent((c) => {
-			const nextIndex = (c + 1) % featured.length;
+			const nextIndex = (c + 1) % featuredNews.length;
 			flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
 			return nextIndex;
 		});
-	}, [featured.length]);
+	}, [featuredNews.length]);
 
   // News ve Events paralel yükleniyor — birbirini beklemez
   useEffect(() => {
@@ -71,22 +74,42 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
       setIsNewsLoading(true);
       setIsEventsLoading(true);
 
-      const [newsResult, eventsResult] = await Promise.allSettled([
-        newsService.getAll(),
-        // getFeatured yoksa getAll'a tek seferlik düşer, waterfall olmaz
+      const [slidesResult, latestResult, eventsResult] = await Promise.allSettled([
+        newsService.getSlides(),
+        newsService.getLatest(),
         eventService.getFeatured().catch(() => eventService.getAll()),
       ]);
 
-      if (newsResult.status === 'fulfilled') {
-        setArticles(newsResult.value.map(toNewsArticle));
-        setNewsError(null);
+      const errs: string[] = [];
+      if (slidesResult.status === 'fulfilled') {
+        setFeaturedNews(slidesResult.value.map(toNewsArticle));
       } else {
-        const message = newsResult.reason instanceof Error
-          ? newsResult.reason.message
-          : 'Failed to fetch news.';
-        setNewsError(message);
-        if (USE_MOCK) setArticles(newsArticles);
+        setFeaturedNews([]);
+        errs.push(
+          slidesResult.reason instanceof Error
+            ? slidesResult.reason.message
+            : 'Featured news unavailable.',
+        );
       }
+      if (latestResult.status === 'fulfilled') {
+        const slideIds =
+          slidesResult.status === 'fulfilled'
+            ? new Set(slidesResult.value.map((n) => n._id))
+            : new Set<string>();
+        setLatestNews(
+          latestResult.value
+            .filter((n) => !slideIds.has(n._id))
+            .map(toNewsArticle),
+        );
+      } else {
+        setLatestNews([]);
+        errs.push(
+          latestResult.reason instanceof Error
+            ? latestResult.reason.message
+            : 'Latest news unavailable.',
+        );
+      }
+      setNewsError(errs.length ? errs.join(' ') : null);
 
       if (eventsResult.status === 'fulfilled') {
         const data = eventsResult.value;
@@ -103,22 +126,20 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
   }, []);
 
 	useEffect(() => {
-		if (featured.length === 0) return;
+		if (featuredNews.length === 0) return;
 		const timer = setInterval(next, 5000);
 		return () => clearInterval(timer);
-	}, [next, featured.length]);
+	}, [next, featuredNews.length]);
 
 	useEffect(() => {
-		if (featured.length === 0) {
+		if (featuredNews.length === 0) {
 			setCurrent(0);
 			return;
 		}
-		if (current >= featured.length) {
+		if (current >= featuredNews.length) {
 			setCurrent(0);
 		}
-	}, [featured.length, current]);
-
-	const currentArticle = featured[current];
+	}, [featuredNews.length, current]);
 
 	return (
 		<ScrollView
@@ -172,19 +193,19 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 				)}
 				<FlatList
 					ref={flatListRef}
-					data={featured}
+					data={featuredNews}
 					horizontal
 					pagingEnabled
 					showsHorizontalScrollIndicator={false}
 					onMomentumScrollEnd={(e) => {
-						if (featured.length === 0) return;
+						if (featuredNews.length === 0) return;
 						const denominator = width - 32;
 						if (!denominator) return;
 						const idx = Math.round(e.nativeEvent.contentOffset.x / denominator);
 						if (Number.isNaN(idx)) return;
 						const boundedIdx = Math.min(
 							Math.max(idx, 0),
-							Math.max(featured.length - 1, 0),
+							Math.max(featuredNews.length - 1, 0),
 						);
 						setCurrent(boundedIdx);
 					}}
@@ -193,10 +214,7 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 						<TouchableOpacity
 							style={{ width: width - 32 }}
 							activeOpacity={0.9}
-							onPress={() => {
-								setSelectedArticle(item);
-								setArticleOpen(true);
-							}}
+							onPress={() => onNewsPress(item.id)}
 						>
 							<View style={styles.heroCard}>
 								<Image source={{ uri: item.image }} style={styles.heroImage} />
@@ -227,11 +245,11 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 				/>
 				{/* Dots */}
 				<View style={styles.dots}>
-					{featured.map((_, i) => (
+					{featuredNews.map((_, i) => (
 						<TouchableOpacity
 							key={i}
 							onPress={() => {
-								if (featured.length === 0) return;
+								if (featuredNews.length === 0) return;
 								flatListRef.current?.scrollToIndex({
 									index: i,
 									animated: true,
@@ -361,7 +379,7 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 					LATEST NEWS
 				</Text>
 				<FlatList
-					data={latest}
+					data={latestNews}
 					keyExtractor={(item) => item.id}
 					scrollEnabled={false}
 					ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -371,79 +389,11 @@ const HomeScreen = ({ onEventPress }: HomeScreenProps) => {
 					renderItem={({ item: article }) => (
 						<NewsCard
 							article={article}
-							onPress={() => {
-								setSelectedArticle(article);
-								setArticleOpen(true);
-							}}
+							onPress={() => onNewsPress(article.id)}
 						/>
 					)}
 				/>
 			</View>
-
-			{/* Article Modal */}
-			<Modal
-				visible={articleOpen}
-				animationType="slide"
-				presentationStyle="pageSheet"
-				onRequestClose={() => setArticleOpen(false)}
-			>
-				<View
-					style={[styles.articleModal, { backgroundColor: colors.background }]}
-				>
-					<View
-						style={[styles.articleHeader, { borderBottomColor: colors.border }]}
-					>
-						<Text
-							style={[styles.articleHeaderTitle, { color: colors.foreground }]}
-						>
-							Article
-						</Text>
-						<TouchableOpacity onPress={() => setArticleOpen(false)}>
-							<Ionicons name="close" size={24} color={colors.foreground} />
-						</TouchableOpacity>
-					</View>
-					<ScrollView
-						style={{ flex: 1 }}
-						contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-					>
-						{selectedArticle && (
-							<>
-								<Image
-									source={{ uri: selectedArticle.image }}
-									style={styles.articleImage}
-								/>
-								<Text
-									style={[styles.articleTitle, { color: colors.foreground }]}
-								>
-									{selectedArticle.title}
-								</Text>
-								<Text
-									style={[
-										styles.articleBody,
-										{ color: colors.mutedForeground },
-									]}
-								>
-									Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
-									do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-									Ut enim ad minim veniam, quis nostrud exercitation ullamco
-									laboris nisi ut aliquip ex ea commodo consequat.
-								</Text>
-								<Text
-									style={[
-										styles.articleBody,
-										{ color: colors.mutedForeground, marginTop: 12 },
-									]}
-								>
-									Duis aute irure dolor in reprehenderit in voluptate velit esse
-									cillum dolore eu fugiat nulla pariatur. Excepteur sint
-									occaecat cupidatat non proident, sunt in culpa qui officia
-									deserunt mollit anim id est laborum.
-								</Text>
-							</>
-						)}
-					</ScrollView>
-				</View>
-			</Modal>
 		</ScrollView>
 	);
 };
@@ -507,24 +457,6 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	dot: { width: 8, height: 8, borderRadius: 4 },
-	articleModal: { flex: 1 },
-	articleHeader: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-		borderBottomWidth: 1,
-	},
-	articleHeaderTitle: { fontSize: 17, fontWeight: "700" },
-	articleImage: {
-		width: "100%",
-		height: 200,
-		borderRadius: 14,
-		marginBottom: 16,
-	},
-	articleTitle: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
-	articleBody: { fontSize: 14, lineHeight: 22 },
 	miniEventCard: {
 		borderRadius: 14,
 		overflow: "hidden",

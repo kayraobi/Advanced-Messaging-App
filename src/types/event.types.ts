@@ -1,12 +1,22 @@
-import { MongoDocument } from './common.types';
+/** Instagram carousel item from GET /api/events/{id} (see Swagger Event schema). */
+export interface EventChildPost {
+	type?: string;
+	displayUrl?: string | null;
+	videoUrl?: string | null;
+	alt?: string | null;
+}
 
-// Swagger'daki gerçek Event şeması —
-// Instagram'dan çekildiği için title/location değil content/url var
-export interface Event extends MongoDocument {
-  content: string[];
-  images: string[];
-  videos: string[];
-  url: string[];
-  timestamp: string;
-  pinned?: boolean;
+/**
+ * Event document from GET /api/events/{id} — production uses string `content`, optional `childPosts`.
+ */
+export interface Event {
+	_id: string;
+	content: string | string[];
+	displayUrl?: string;
+	url?: string | string[];
+	date?: string;
+	childPosts?: EventChildPost[];
+	pinned?: boolean;
+	priority?: number;
+	__v?: number;
 }

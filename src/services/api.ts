@@ -6,7 +6,7 @@ import axios, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3030";
-export const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK === 'true' || !process.env.EXPO_PUBLIC_API_URL;
+export const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK === "true";
 
 const api: AxiosInstance = axios.create({
 	baseURL: BASE_URL,

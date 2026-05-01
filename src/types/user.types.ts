@@ -3,6 +3,9 @@ export interface User {
   username: string;
   email: string;
   type: string; // "GM" veya başka roller — Ibrahim'den öğrenince genişletiriz
+  name?: string;
+  phone?: string;
+  interests?: string[];
 }
 
 export interface LoginRequest {
