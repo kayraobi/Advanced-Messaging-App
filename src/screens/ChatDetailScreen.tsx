@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
@@ -104,12 +106,10 @@ const pollOptions = [
 ];
 const totalVotes = pollOptions.reduce((s, o) => s + o.votes, 0);
 
-interface ChatDetailScreenProps {
-  chatId: string;
-  onBack: () => void;
-}
-
-const ChatDetailScreen = ({ chatId, onBack }: ChatDetailScreenProps) => {
+const ChatDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'ChatDetail'>['route']>();
+  const { chatId } = route.params;
   const { colors } = useTheme();
   const isDm = chatId.startsWith('dm-');
   const dmProfile = isDm ? dmProfiles[chatId] : null;
@@ -181,8 +181,8 @@ const ChatDetailScreen = ({ chatId, onBack }: ChatDetailScreenProps) => {
     >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={20} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>

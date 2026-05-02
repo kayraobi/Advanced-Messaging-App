@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -10,11 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
-interface SettingsScreenProps {
-  onBack: () => void;
-}
-
-const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
+const SettingsScreen = () => {
+  const navigation = useNavigation();
   const { colors, theme, toggleTheme } = useTheme();
   const [pushNotifications, setPushNotifications] = useState(true);
   const [weatherAlerts, setWeatherAlerts] = useState(false);
@@ -86,11 +84,10 @@ const SettingsScreen = ({ onBack }: SettingsScreenProps) => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>App Settings</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>

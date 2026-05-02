@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
@@ -19,12 +21,10 @@ import { placesService, Place } from '../services/placesService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface PlaceDetailScreenProps {
-  placeId: string;
-  onBack: () => void;
-}
-
-const PlaceDetailScreen = ({ placeId, onBack }: PlaceDetailScreenProps) => {
+const PlaceDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'PlaceDetail'>['route']>();
+  const { placeId } = route.params;
   const { colors } = useTheme();
   const [place, setPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,8 +78,8 @@ const PlaceDetailScreen = ({ placeId, onBack }: PlaceDetailScreenProps) => {
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Ionicons name="arrow-back" size={20} color="#333" />
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
         </View>
 

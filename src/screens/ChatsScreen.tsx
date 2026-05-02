@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -21,12 +22,8 @@ const directMessages = [
   { id: 'dm-6', name: 'Sara Bašić', initials: 'SB', lastMessage: 'Great meeting you at the event! 🎉', time: '1d ago', unread: 0 },
 ];
 
-interface ChatsScreenProps {
-  onChatPress: (id: string) => void;
-  onGlobalChatPress: () => void;
-}
-
-const ChatsScreen = ({ onChatPress, onGlobalChatPress }: ChatsScreenProps) => {
+const ChatsScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [tab, setTab] = useState<'groups' | 'dms'>('groups');
   const [eventList, setEventList] = useState<any[]>([]);
@@ -62,7 +59,7 @@ const ChatsScreen = ({ onChatPress, onGlobalChatPress }: ChatsScreenProps) => {
         <View style={styles.content}>
           {/* Global Community Chat */}
           <TouchableOpacity
-            onPress={onGlobalChatPress}
+            onPress={() => navigation.navigate('GlobalChat')}
             style={[styles.globalRoom, { backgroundColor: colors.card, borderColor: colors.primary }]}
           >
             <View style={styles.globalTitle}>
@@ -106,7 +103,7 @@ const ChatsScreen = ({ onChatPress, onGlobalChatPress }: ChatsScreenProps) => {
                   return (
                     <TouchableOpacity
                       key={event._id}
-                      onPress={() => onChatPress(event._id)}
+                      onPress={() => navigation.navigate('ChatDetail', { chatId: `event-${event._id}` })}
                       style={[
                         styles.chatRow,
                         { borderBottomColor: colors.border },
@@ -148,7 +145,7 @@ const ChatsScreen = ({ onChatPress, onGlobalChatPress }: ChatsScreenProps) => {
             {directMessages.map((dm, idx) => (
               <TouchableOpacity
                 key={dm.id}
-                onPress={() => onChatPress(dm.id)}
+                onPress={() => navigation.navigate('ChatDetail', { chatId: dm.id })}
                 style={[
                   styles.chatRow,
                   { borderBottomColor: colors.border },

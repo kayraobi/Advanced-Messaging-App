@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View, Text, Image, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
@@ -8,12 +10,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import { tripsService, Trip, TripApplication } from '../services/tripsService';
 import { authService } from '../services/authService';
 
-interface TripDetailScreenProps {
-  tripId: string;
-  onBack: () => void;
-}
-
-const TripDetailScreen = ({ tripId, onBack }: TripDetailScreenProps) => {
+const TripDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'TripDetail'>['route']>();
+  const { tripId } = route.params;
   const { colors } = useTheme();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,8 +107,8 @@ const TripDetailScreen = ({ tripId, onBack }: TripDetailScreenProps) => {
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Ionicons name="arrow-back" size={20} color="#333" />
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
           {price ? (
             <View style={[styles.priceBadge, { backgroundColor: colors.primary }]}>

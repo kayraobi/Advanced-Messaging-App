@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -17,13 +18,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { placesService } from '../services/placesService';
 import { uploadService } from '../services/uploadService';
 
-interface SubmitPlaceScreenProps {
-  onBack: () => void;
-  onSubmitted?: (placeId: string) => void;
-}
-
-/** POST /api/places (auth) or POST /api/places/ (guest) — [Swagger](https://test.sarajevoexpats.com/api/api-docs/#/) */
-const SubmitPlaceScreen = ({ onBack, onSubmitted }: SubmitPlaceScreenProps) => {
+const SubmitPlaceScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -123,8 +119,6 @@ const SubmitPlaceScreen = ({ onBack, onSubmitted }: SubmitPlaceScreenProps) => {
       }
 
       Alert.alert('Submitted', 'Thank you — your place suggestion was sent.');
-      onSubmitted?.(place._id);
-      onBack();
     } catch (e) {
       Alert.alert('Submit failed', e instanceof Error ? e.message : 'Try again.');
     } finally {
@@ -135,11 +129,10 @@ const SubmitPlaceScreen = ({ onBack, onSubmitted }: SubmitPlaceScreenProps) => {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Suggest a place</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">

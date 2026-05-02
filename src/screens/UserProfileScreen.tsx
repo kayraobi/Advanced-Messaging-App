@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
@@ -12,12 +14,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import type { User } from '../types/user.types';
 import { usersService } from '../services/usersService';
 
-interface UserProfileScreenProps {
-  userId: string;
-  onBack: () => void;
-}
-
-const UserProfileScreen = ({ userId, onBack }: UserProfileScreenProps) => {
+const UserProfileScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'UserProfile'>['route']>();
+  const { userId } = route.params;
   const { colors } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,11 +45,10 @@ const UserProfileScreen = ({ userId, onBack }: UserProfileScreenProps) => {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Member</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (

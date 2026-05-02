@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -21,31 +22,8 @@ import type { User } from '../types/user.types';
 
 const allInterests = ['Sports', 'Culture', 'Food & Drink', 'Tech', 'Networking', 'Music', 'Travel', 'Volunteering'];
 
-interface ProfileScreenProps {
-  onMyEvents: () => void;
-  onSettings: () => void;
-  onFaq: () => void;
-  onLogout: () => void;
-  /** Opens real-estate detail (`GET /api/realEstate/{id}`) */
-  onRealEstatePress?: (id: string) => void;
-  onSuggestPlace?: () => void;
-  onPostListing?: () => void;
-  onBusinessPartnership?: () => void;
-  /** Shown only when account type is GM */
-  onGmAdmin?: () => void;
-}
-
-const ProfileScreen = ({
-  onMyEvents,
-  onSettings,
-  onFaq,
-  onLogout,
-  onRealEstatePress,
-  onSuggestPlace,
-  onPostListing,
-  onBusinessPartnership,
-  onGmAdmin,
-}: ProfileScreenProps) => {
+const ProfileScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [showInterests, setShowInterests] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(['Sports', 'Food & Drink']);
@@ -67,10 +45,10 @@ const ProfileScreen = ({
 
   useEffect(() => {
     const loadUser = async () => {
-      // Önce stored user'ı göster (hızlı)
+      // Show stored user first for fast loading
       const stored = await authService.getStoredUser();
       if (stored) setUser(stored);
-      // Sonra API'den güncel veriyi çek
+      // Then fetch the latest data from the API
       const fresh = await authService.getMe();
       if (fresh) setUser(fresh);
       setUserLoading(false);
@@ -94,7 +72,6 @@ const ProfileScreen = ({
   };
 
   const openMyListings = async () => {
-    if (!onRealEstatePress) return;
     if (!user?._id) {
       Alert.alert('Sign in required', 'Log in to see your property listings.');
       return;
@@ -119,62 +96,46 @@ const ProfileScreen = ({
     {
       icon: 'calendar-clear-outline' as const,
       label: 'My Events',
-      onPress: onMyEvents,
+      onPress: () => navigation.navigate('MyEvents'),
     },
-    ...(onRealEstatePress
-      ? [
-          {
-            icon: 'home-outline' as const,
-            label: 'My listings',
-            onPress: openMyListings,
-          },
-        ]
-      : []),
-    ...(onSuggestPlace
-      ? [
-          {
-            icon: 'location-outline' as const,
-            label: 'Suggest a place',
-            onPress: onSuggestPlace,
-          },
-        ]
-      : []),
-    ...(onPostListing
-      ? [
-          {
-            icon: 'add-circle-outline' as const,
-            label: 'Post a listing',
-            onPress: onPostListing,
-          },
-        ]
-      : []),
-    ...(onBusinessPartnership
-      ? [
-          {
-            icon: 'briefcase-outline' as const,
-            label: 'Business partnership',
-            onPress: onBusinessPartnership,
-          },
-        ]
-      : []),
-    ...(onGmAdmin && user?.type === 'GM'
+    {
+      icon: 'home-outline' as const,
+      label: 'My listings',
+      onPress: openMyListings,
+    },
+    {
+      icon: 'location-outline' as const,
+      label: 'Suggest a place',
+      onPress: () => navigation.navigate('SubmitPlace'),
+    },
+    {
+      icon: 'add-circle-outline' as const,
+      label: 'Post a listing',
+      onPress: () => navigation.navigate('SubmitRealEstate'),
+    },
+    {
+      icon: 'briefcase-outline' as const,
+      label: 'Business partnership',
+      onPress: () => navigation.navigate('BusinessPartnership'),
+    },
+    ...(user?.type === 'GM'
       ? [
           {
             icon: 'layers-outline' as const,
             label: 'Admin: roles & sponsors',
-            onPress: onGmAdmin,
+            onPress: () => navigation.navigate('GmAdmin'),
           },
         ]
       : []),
     {
       icon: 'help-circle-outline' as const,
       label: 'FAQ',
-      onPress: onFaq,
+      onPress: () => navigation.navigate('Qaas'),
     },
     {
       icon: 'settings-outline' as const,
       label: 'App Settings',
-      onPress: onSettings,
+      onPress: () => navigation.navigate('Settings'),
     },
   ];
 
@@ -438,7 +399,6 @@ const ProfileScreen = ({
                   <TouchableOpacity
                     onPress={() => {
                       setShowListings(false);
-                      onRealEstatePress?.(item._id);
                     }}
                     style={[styles.listingRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                   >
@@ -490,7 +450,7 @@ const ProfileScreen = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.logoutConfirm}
-                onPress={() => { setShowLogoutConfirm(false); onLogout(); }}
+                onPress={() => { setShowLogoutConfirm(false); }}
               >
                 <Text style={styles.logoutConfirmText}>Log Out</Text>
               </TouchableOpacity>

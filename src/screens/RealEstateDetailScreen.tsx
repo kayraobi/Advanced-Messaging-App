@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
@@ -18,14 +20,10 @@ import { realEstateService, RealEstate } from '../services/realEstateService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface RealEstateDetailScreenProps {
-  listingId: string;
-  onBack: () => void;
-  /** Opens profile loaded via GET /api/users/{id} */
-  onUserPress?: (userId: string) => void;
-}
-
-const RealEstateDetailScreen = ({ listingId, onBack, onUserPress }: RealEstateDetailScreenProps) => {
+const RealEstateDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'RealEstateDetail'>['route']>();
+  const listingId = route.params.realEstateId;
   const { colors } = useTheme();
   const [listing, setListing] = useState<RealEstate | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,8 +90,8 @@ const RealEstateDetailScreen = ({ listingId, onBack, onUserPress }: RealEstateDe
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Ionicons name="arrow-back" size={20} color="#333" />
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
           {price ? (
             <View style={[styles.priceBadge, { backgroundColor: colors.primary }]}>
@@ -153,12 +151,8 @@ const RealEstateDetailScreen = ({ listingId, onBack, onUserPress }: RealEstateDe
             </View>
           ) : null}
 
-          {onUserPress && ownerId ? (
-            <TouchableOpacity
-              style={[styles.sellerRow, { backgroundColor: colors.muted }]}
-              onPress={() => onUserPress(ownerId)}
-              activeOpacity={0.75}
-            >
+          {ownerId ? (
+            <View style={[styles.sellerRow, { backgroundColor: colors.muted }]}>
               <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sellerLabel, { color: colors.mutedForeground }]}>Listed by</Text>
@@ -166,8 +160,7 @@ const RealEstateDetailScreen = ({ listingId, onBack, onUserPress }: RealEstateDe
                   {ownerLabel || 'Member'}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
-            </TouchableOpacity>
+            </View>
           ) : null}
 
           {/* Description */}

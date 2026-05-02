@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -19,18 +20,12 @@ import type { User } from '../types/user.types';
 import { servicesService, Service } from '../services/servicesService';
 import { tripsService, Trip } from '../services/tripsService';
 
-interface GmAdminScreenProps {
-  onBack: () => void;
-  onOpenSponsor?: (id: string) => void;
-  onOpenUser?: (id: string) => void;
-}
-
 type AdminTab = 'sponsors' | 'roles' | 'users' | 'services' | 'trips';
 
 const TAB_ORDER: AdminTab[] = ['sponsors', 'roles', 'users', 'services', 'trips'];
 
-/** GM tools — Stage 1 APIs: users list, services CRUD, trips CRUD, roles/sponsors (existing). */
-const GmAdminScreen = ({ onBack, onOpenSponsor, onOpenUser }: GmAdminScreenProps) => {
+const GmAdminScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [tab, setTab] = useState<AdminTab>('sponsors');
 
@@ -467,11 +462,10 @@ const GmAdminScreen = ({ onBack, onOpenSponsor, onOpenUser }: GmAdminScreenProps
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Admin</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -580,18 +574,11 @@ const GmAdminScreen = ({ onBack, onOpenSponsor, onOpenUser }: GmAdminScreenProps
                     key={item._id}
                     style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 8 }]}
                   >
-                    <TouchableOpacity
-                      onPress={() => onOpenSponsor?.(item._id)}
-                      disabled={!onOpenSponsor}
-                      style={{ gap: 4 }}
-                    >
+                    <View style={{ gap: 4 }}>
                       <Text style={{ color: colors.foreground, fontWeight: '700' }}>
                         {(item.name ?? item.title ?? item._id) as string}
                       </Text>
-                      {onOpenSponsor ? (
-                        <Text style={{ color: colors.primary, fontSize: 12 }}>View detail →</Text>
-                      ) : null}
-                    </TouchableOpacity>
+                    </View>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
                       <TouchableOpacity onPress={() => openEditSponsor(item)}>
                         <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Edit (PUT)</Text>
@@ -665,18 +652,11 @@ const GmAdminScreen = ({ onBack, onOpenSponsor, onOpenUser }: GmAdminScreenProps
                     key={u._id}
                     style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, gap: 10 }]}
                   >
-                    <TouchableOpacity
-                      onPress={() => onOpenUser?.(u._id)}
-                      disabled={!onOpenUser}
-                      style={{ gap: 4 }}
-                    >
+                    <View style={{ gap: 4 }}>
                       <Text style={{ color: colors.foreground, fontWeight: '700' }}>{u.username}</Text>
                       <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>{u.email}</Text>
                       <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Type: {u.type}</Text>
-                      {onOpenUser ? (
-                        <Text style={{ color: colors.primary, fontSize: 12 }}>Open profile →</Text>
-                      ) : null}
-                    </TouchableOpacity>
+                    </View>
                     <TouchableOpacity onPress={() => deleteUser(u)}>
                       <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 13 }}>
                         Delete user (DELETE /api/users/id)

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -14,12 +15,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { eventService } from '../services/eventService';
 import { contentToPlainLines } from '../utils/eventPresentation';
 
-interface MyEventsScreenProps {
-  onBack: () => void;
-  onEventPress: (id: string) => void;
-}
-
-const MyEventsScreen = ({ onBack, onEventPress }: MyEventsScreenProps) => {
+const MyEventsScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +49,7 @@ const MyEventsScreen = ({ onBack, onEventPress }: MyEventsScreenProps) => {
     return (
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => onEventPress(String(item._id))}
+        onPress={() => navigation.navigate('EventDetail', { eventId: item._id })}
         style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
         {item.displayUrl ? (
@@ -81,11 +78,10 @@ const MyEventsScreen = ({ onBack, onEventPress }: MyEventsScreenProps) => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>My Events</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (

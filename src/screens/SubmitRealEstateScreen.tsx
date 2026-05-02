@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -17,13 +18,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { realEstateService } from '../services/realEstateService';
 import { uploadService } from '../services/uploadService';
 
-interface SubmitRealEstateScreenProps {
-  onBack: () => void;
-  onSubmitted?: (listingId: string) => void;
-}
-
-/** POST /api/realEstate/ — authenticated ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Real%20Estate/post_api_realEstate_)) */
-const SubmitRealEstateScreen = ({ onBack, onSubmitted }: SubmitRealEstateScreenProps) => {
+const SubmitRealEstateScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -124,8 +120,6 @@ const SubmitRealEstateScreen = ({ onBack, onSubmitted }: SubmitRealEstateScreenP
 
       const listing = await realEstateService.submit(payload);
       Alert.alert('Submitted', 'Your listing was sent for review.');
-      onSubmitted?.(listing._id);
-      onBack();
     } catch (e) {
       Alert.alert('Submit failed', e instanceof Error ? e.message : 'Try again.');
     } finally {
@@ -136,11 +130,10 @@ const SubmitRealEstateScreen = ({ onBack, onSubmitted }: SubmitRealEstateScreenP
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Post listing</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">

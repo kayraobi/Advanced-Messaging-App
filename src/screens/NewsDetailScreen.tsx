@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
@@ -13,15 +15,13 @@ import { useTheme } from '../contexts/ThemeContext';
 import { newsService } from '../services/newsService';
 import type { News } from '../types/news.types';
 
-interface NewsDetailScreenProps {
-  newsId: string;
-  onBack: () => void;
-}
-
 const stripHtml = (html: string): string =>
   html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
-const NewsDetailScreen = ({ newsId, onBack }: NewsDetailScreenProps) => {
+const NewsDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'NewsDetail'>['route']>();
+  const { newsId } = route.params;
   const { colors } = useTheme();
   const [item, setItem] = useState<News | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,13 +53,12 @@ const NewsDetailScreen = ({ newsId, onBack }: NewsDetailScreenProps) => {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn} accessibilityRole="button">
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
           Article
         </Text>
-        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (
