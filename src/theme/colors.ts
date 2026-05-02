@@ -1,5 +1,5 @@
 // Primary renk: orange (#f97316) — HSL(24,95%,53%) => hex ~#f97316
-// Muted, border, card, background renkleri tanımlı
+// Muted, border, card, background colors are defined
 
 export const lightColors = {
   background: '#ffffff',

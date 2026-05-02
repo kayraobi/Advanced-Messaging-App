@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
 import {
 	View,
 	Text,
@@ -13,11 +14,8 @@ import { useTheme } from "../contexts/ThemeContext";
 import { eventService } from "../services/eventService";
 import { parse, isAfter, isBefore, startOfDay, format } from "date-fns";
 
-interface CalendarScreenProps {
-	onEventPress: (id: string) => void;
-}
-
-const CalendarScreen = ({ onEventPress }: CalendarScreenProps) => {
+const CalendarScreen = () => {
+	const navigation = useNavigation();
 	const { colors } = useTheme();
 	const [events, setEvents] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -114,7 +112,7 @@ const CalendarScreen = ({ onEventPress }: CalendarScreenProps) => {
 				return (
 					<TouchableOpacity
 						key={event._id}
-						onPress={() => onEventPress(event._id)}
+						onPress={() => navigation.navigate('EventDetail', { eventId: event._id })}
 						style={[
 							styles.eventCard,
 							{ backgroundColor: colors.card, borderColor: colors.border },

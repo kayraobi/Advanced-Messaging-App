@@ -108,7 +108,7 @@ export const authService = {
         throw new Error('Login response does not include token.');
       }
 
-      // Token'ı storage'a kaydet
+      // Save token to storage
       await AsyncStorage.setItem('auth_token', token);
 
       try {
@@ -121,7 +121,7 @@ export const authService = {
         /* fall through */
       }
 
-      // Backend mock token JWT olmayabilir; önce decode dene, olmazsa response.user kullan.
+      // Backend mock token might not be a JWT; try to decode first, fallback to response.user if it fails.
       try {
         const decoded = jwtDecode<JwtPayload>(token);
         const normalized = normalizeUserFromMe(decoded.user);
@@ -161,12 +161,12 @@ export const authService = {
     }
   },
 
-  // Storage'ı temizle
+  // Clear storage
   logout: async (): Promise<void> => {
     await AsyncStorage.multiRemove(['auth_token', 'auth_user']);
   },
 
-  // Uygulama açılışında mevcut kullanıcıyı getir
+  // Fetch current user on app startup
   getStoredUser: async (): Promise<User | null> => {
     try {
       const raw = await AsyncStorage.getItem('auth_user');
@@ -175,12 +175,12 @@ export const authService = {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) return null;
 
-      // Mock modda token doğrulama atla
+      // Skip token verification in mock mode
       if (USE_MOCK || token === 'mock_token') {
         return JSON.parse(raw);
       }
 
-      // Token süresi dolmuş mu kontrol et
+      // Check if token is expired
       const decoded = jwtDecode<JwtPayload>(token);
       const isExpired = decoded.exp * 1000 < Date.now();
 

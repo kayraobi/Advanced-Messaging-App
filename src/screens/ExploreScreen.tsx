@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View, Text, FlatList, TouchableOpacity, Image,
   StyleSheet, TextInput, ActivityIndicator, ScrollView,
@@ -13,15 +14,6 @@ import { placeTypesService, PlaceType } from '../services/placeTypesService';
 import { serviceTypesService, ServiceType } from '../services/serviceTypesService';
 
 type ExploreTab = 'places' | 'realEstate' | 'services' | 'trips';
-
-interface ExploreScreenProps {
-  onPlacePress: (id: string) => void;
-  onRealEstatePress: (id: string) => void;
-  onServicePress: (id: string) => void;
-  onTripPress: (id: string) => void;
-  onSubmitPlace?: () => void;
-  onSubmitRealEstate?: () => void;
-}
 
 const getTitle = (item: any): string =>
   (item.name ?? item.title ?? (item.content ?? '').split('\n')[0].trim()) || 'Item';
@@ -43,14 +35,8 @@ const TAB_COLORS: Record<ExploreTab, string> = {
   trips:      '#0ea5e9',
 };
 
-const ExploreScreen = ({
-  onPlacePress,
-  onRealEstatePress,
-  onServicePress,
-  onTripPress,
-  onSubmitPlace,
-  onSubmitRealEstate,
-}: ExploreScreenProps) => {
+const ExploreScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [tab, setTab] = useState<ExploreTab>('places');
   const [search, setSearch] = useState('');
@@ -75,9 +61,9 @@ const ExploreScreen = ({
     places: null, realEstate: null, services: null, trips: null,
   });
 
-  // Hangi sekmelerin daha önce yüklendiğini takip eden cache seti
+  // Cache set tracking which tabs have been loaded previously
   const [loaded, setLoaded] = useState<Set<ExploreTab>>(new Set());
-  /** Places "All" chip / tip filtresinden önceki tam liste ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Place%20Types/get_api_placeTypes__id_) ile chip seçiminde yenilenir) */
+  /** Places "All" full list before chip/type filter ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Place%20Types/get_api_placeTypes__id_) refreshes on chip select) */
   const placesBaselineRef = useRef<Place[]>([]);
   const servicesBaselineRef = useRef<Service[]>([]);
 
@@ -260,14 +246,14 @@ const ExploreScreen = ({
     return true;
   });
 
-  // Aktif tab için gösterilecek filtre tipleri
+  // Filter types to display for the active tab
   const activeTypes = tab === 'places' ? placeTypes : tab === 'services' ? serviceTypes : [];
 
   const onPressMap: Record<ExploreTab, (id: string) => void> = {
-    places: onPlacePress,
-    realEstate: onRealEstatePress,
-    services: onServicePress,
-    trips: onTripPress,
+    places: (id) => navigation.navigate('PlaceDetail', { placeId: id }),
+    realEstate: (id) => navigation.navigate('RealEstateDetail', { realEstateId: id }),
+    services: (id) => navigation.navigate('ServiceDetail', { serviceId: id }),
+    trips: (id) => navigation.navigate('TripDetail', { tripId: id }),
   };
 
   const accentColor = TAB_COLORS[tab];
@@ -435,28 +421,26 @@ const ExploreScreen = ({
         })}
       </View>
 
-      {(tab === 'places' && onSubmitPlace) || (tab === 'realEstate' && onSubmitRealEstate) ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16, paddingBottom: 8 }}>
-          {tab === 'places' && onSubmitPlace ? (
-            <TouchableOpacity
-              onPress={onSubmitPlace}
-              style={[styles.quickLink, { borderColor: TAB_COLORS.places, backgroundColor: TAB_COLORS.places + '12' }]}
-            >
-              <Ionicons name="add-circle-outline" size={18} color={TAB_COLORS.places} />
-              <Text style={[styles.quickLinkText, { color: TAB_COLORS.places }]}>Suggest a place</Text>
-            </TouchableOpacity>
-          ) : null}
-          {tab === 'realEstate' && onSubmitRealEstate ? (
-            <TouchableOpacity
-              onPress={onSubmitRealEstate}
-              style={[styles.quickLink, { borderColor: TAB_COLORS.realEstate, backgroundColor: TAB_COLORS.realEstate + '12' }]}
-            >
-              <Ionicons name="home-outline" size={18} color={TAB_COLORS.realEstate} />
-              <Text style={[styles.quickLinkText, { color: TAB_COLORS.realEstate }]}>Post a listing</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16, paddingBottom: 8 }}>
+        {tab === 'places' ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('SubmitPlace')}
+            style={[styles.quickLink, { borderColor: TAB_COLORS.places, backgroundColor: TAB_COLORS.places + '12' }]}
+          >
+            <Ionicons name="add-circle-outline" size={18} color={TAB_COLORS.places} />
+            <Text style={[styles.quickLinkText, { color: TAB_COLORS.places }]}>Suggest a place</Text>
+          </TouchableOpacity>
+        ) : null}
+        {tab === 'realEstate' ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('SubmitRealEstate')}
+            style={[styles.quickLink, { borderColor: TAB_COLORS.realEstate, backgroundColor: TAB_COLORS.realEstate + '12' }]}
+          >
+            <Ionicons name="home-outline" size={18} color={TAB_COLORS.realEstate} />
+            <Text style={[styles.quickLinkText, { color: TAB_COLORS.realEstate }]}>Post a listing</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       {/* Count */}
       {!loading[tab] && !errors[tab] && (

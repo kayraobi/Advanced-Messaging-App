@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View, Text, Image, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Linking,
@@ -7,12 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { servicesService, Service } from '../services/servicesService';
 
-interface ServiceDetailScreenProps {
-  serviceId: string;
-  onBack: () => void;
-}
-
-const ServiceDetailScreen = ({ serviceId, onBack }: ServiceDetailScreenProps) => {
+const ServiceDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'ServiceDetail'>['route']>();
+  const { serviceId } = route.params;
   const { colors } = useTheme();
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,8 +72,8 @@ const ServiceDetailScreen = ({ serviceId, onBack }: ServiceDetailScreenProps) =>
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Ionicons name="arrow-back" size={20} color="#333" />
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
         </View>
 

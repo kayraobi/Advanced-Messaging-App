@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, TextInput,
@@ -7,11 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { qaasService, QaA } from '../services/qaasService';
 
-interface QaasScreenProps {
-  onBack: () => void;
-}
-
-const QaasScreen = ({ onBack }: QaasScreenProps) => {
+const QaasScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [qaas, setQaas] = useState<QaA[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,18 +55,17 @@ const QaasScreen = ({ onBack }: QaasScreenProps) => {
     q.answer.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Kategorilere göre grupla
+  // Group by categories
   const categories = Array.from(new Set(filtered.map((q) => q.category ?? 'General')));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>FAQ</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (

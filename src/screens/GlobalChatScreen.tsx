@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -42,11 +43,8 @@ const pollOptions = [
 ];
 const totalVotes = pollOptions.reduce((s, o) => s + o.votes, 0);
 
-interface GlobalChatScreenProps {
-  onBack: () => void;
-}
-
-const GlobalChatScreen = ({ onBack }: GlobalChatScreenProps) => {
+const GlobalChatScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
@@ -75,8 +73,8 @@ const GlobalChatScreen = ({ onBack }: GlobalChatScreenProps) => {
     >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={20} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Global Community Chat</Text>

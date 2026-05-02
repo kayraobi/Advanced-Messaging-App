@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigation } from "@react-navigation/native";
 import {
 	View,
 	Text,
@@ -42,13 +43,8 @@ const toNewsArticle = (newsItem: News): NewsArticle => {
 	};
 };
 
-interface HomeScreenProps {
-	onEventPress: (id: string) => void;
-	onNewsPress: (id: string) => void;
-	onSponsorPress?: (id: string) => void;
-}
-
-const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenProps) => {
+const HomeScreen = () => {
+	const navigation = useNavigation();
 	const { colors } = useTheme();
 	const [current, setCurrent] = useState(0);
 	const [showReminder, setShowReminder] = useState(true);
@@ -75,7 +71,7 @@ const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenPro
 		});
 	}, [featuredNews.length]);
 
-  // News ve Events paralel yükleniyor — birbirini beklemez
+  // News and Events are loaded in parallel — they do not block each other
   useEffect(() => {
     const loadAll = async () => {
       setIsNewsLoading(true);
@@ -239,7 +235,7 @@ const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenPro
 						<TouchableOpacity
 							style={{ width: width - 32 }}
 							activeOpacity={0.9}
-							onPress={() => onNewsPress(item.id)}
+							onPress={() => navigation.navigate('NewsDetail', { newsId: item.id })}
 						>
 							<View style={styles.heroCard}>
 								<Image source={{ uri: item.image }} style={styles.heroImage} />
@@ -321,7 +317,7 @@ const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenPro
 									key={event._id}
 									style={{ width: 280 }}
 									activeOpacity={0.85}
-									onPress={() => onEventPress(event._id)}
+									onPress={() => navigation.navigate('EventDetail', { eventId: event._id })}
 								>
 									<View
 										style={[
@@ -423,8 +419,7 @@ const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenPro
 											{ backgroundColor: colors.card, borderColor: colors.border },
 										]}
 										activeOpacity={0.85}
-										onPress={() => onSponsorPress?.(s._id)}
-										disabled={!onSponsorPress}
+										onPress={() => navigation.navigate('SponsorDetail', { sponsorId: s._id })}
 									>
 										{thumb ? (
 											<Image source={{ uri: thumb }} style={styles.sponsorLogo} resizeMode="contain" />
@@ -460,7 +455,7 @@ const HomeScreen = ({ onEventPress, onNewsPress, onSponsorPress }: HomeScreenPro
 					renderItem={({ item: article }) => (
 						<NewsCard
 							article={article}
-							onPress={() => onNewsPress(article.id)}
+							onPress={() => navigation.navigate('NewsDetail', { newsId: article.id })}
 						/>
 					)}
 				/>

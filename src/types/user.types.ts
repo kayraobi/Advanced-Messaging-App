@@ -2,7 +2,7 @@ export interface User {
   _id: string;
   username: string;
   email: string;
-  type: string; // "GM" veya başka roller — Ibrahim'den öğrenince genişletiriz
+  type: string; // "GM" or other roles — will expand once confirmed with Ibrahim
   name?: string;
   phone?: string;
   interests?: string[];
@@ -27,7 +27,7 @@ export interface RegisterRequest {
   phone?: string;
 }
 
-// JWT içindeki payload yapısı
+// Payload structure inside JWT
 export interface JwtPayload {
   user: User;
   iat: number;

@@ -37,7 +37,7 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
   const handleLogin = async () => {
     try {
       setIsSubmitting(true);
-      // 1. Sabit stringleri sildik, kullanıcının ekrana yazdığı form verilerini gönderiyoruz.
+      // 1. Send the actual form data entered by the user instead of hardcoded strings.
       const user = await authService.login({
         email: loginForm.email.trim(),
         password: loginForm.password.trim(),
@@ -46,11 +46,11 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
       console.log(user.username); // "test"
       console.log(user.type);     // "GM"
 
-      // 2. Olmayan 'navigation' yerine, yukarıdan aldığımız 'onLogin' prop'unu tetikliyoruz.
+      // 2. Trigger the 'onLogin' prop passed from AppNavigator to switch stacks.
       onLogin();
 
     } catch (error: any) {
-      // (Opsiyonel) Kullanıcıya hatayı göstermek için bir Alert ekleyebilirsin
+      // (Optional) Add an Alert here to show the error to the user
       Alert.alert('Giriş Başarısız', error.message || 'Lütfen bilgilerinizi kontrol edin.');
       console.error(error.message);
     } finally {
@@ -75,7 +75,7 @@ const AuthScreen = ({ onLogin }: AuthScreenProps) => {
         password: registerForm.password.trim(),
         phone: registerForm.phone.trim() || undefined,
       });
-      // Kayıt sonrası otomatik login
+      // Auto-login after successful registration
       await authService.login({
         email: registerForm.email.trim(),
         password: registerForm.password.trim(),

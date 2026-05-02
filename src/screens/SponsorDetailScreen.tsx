@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
@@ -13,18 +15,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { sponsorsService, Sponsor } from '../services/sponsorsService';
 
-interface SponsorDetailScreenProps {
-  sponsorId: string;
-  onBack: () => void;
-}
-
 const sponsorImage = (s: Sponsor) =>
   (s.logo ?? s.displayUrl ?? s.image ?? null) as string | null;
 
 const sponsorLink = (s: Sponsor) =>
   (s.website ?? s.url ?? s.link ?? '') as string;
 
-const SponsorDetailScreen = ({ sponsorId, onBack }: SponsorDetailScreenProps) => {
+const SponsorDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'SponsorDetail'>['route']>();
+  const { sponsorId } = route.params;
   const { colors } = useTheme();
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,9 +49,6 @@ const SponsorDetailScreen = ({ sponsorId, onBack }: SponsorDetailScreenProps) =>
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text style={{ color: colors.mutedForeground }}>Sponsor not found.</Text>
-        <TouchableOpacity onPress={onBack} style={{ marginTop: 16 }}>
-          <Text style={{ color: colors.primary, fontWeight: '700' }}>Go back</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -64,13 +61,12 @@ const SponsorDetailScreen = ({ sponsorId, onBack }: SponsorDetailScreenProps) =>
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
           {title}
         </Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>

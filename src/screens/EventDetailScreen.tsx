@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
@@ -22,14 +24,12 @@ import { contentToPlainLines, eventInstagramUrl } from '../utils/eventPresentati
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface EventDetailScreenProps {
-  eventId: string;
-  onBack: () => void;
-}
-
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
+const EventDetailScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute<RootStackScreenProps<'EventDetail'>['route']>();
+  const { eventId } = route.params;
   const { colors } = useTheme();
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,8 +118,8 @@ const EventDetailScreen = ({ eventId, onBack }: EventDetailScreenProps) => {
             </View>
           )}
           <View style={styles.coverGradient} />
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Ionicons name="arrow-back" size={20} color="#333" />
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
         </View>
 

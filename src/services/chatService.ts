@@ -1,5 +1,5 @@
-// ⚠️  Supabase kurulumu tamamlanınca bu servis doldurulacak.
-// Arkadaşın şu tabloları oluşturması gerekiyor:
+// This service will be populated once Supabase setup is complete.
+// The following tables need to be created by the backend:
 //   messages  (id, room_id, user_id, content, created_at)
 //   rooms     (id, name, is_global, event_id)
 
@@ -29,7 +29,7 @@ export const chatService = {
     return;
   },
 
-  // Realtime subscription — unsubscribe fonksiyonu döndürür
+  // Realtime subscription — returns an unsubscribe function
   subscribeToRoom: (
     _roomId: string,
     _onMessage: (msg: Message) => void

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -13,12 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { businessService } from '../services/businessService';
 
-interface BusinessPartnershipScreenProps {
-  onBack: () => void;
-}
-
-/** POST /api/business — BusinessSubmission ([Swagger](https://test.sarajevoexpats.com/api/api-docs/#/Business/post_api_business)) */
-const BusinessPartnershipScreen = ({ onBack }: BusinessPartnershipScreenProps) => {
+const BusinessPartnershipScreen = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,7 +39,6 @@ const BusinessPartnershipScreen = ({ onBack }: BusinessPartnershipScreenProps) =
         message: message.trim() || undefined,
       });
       Alert.alert('Thank you', 'Your partnership request has been submitted.');
-      onBack();
     } catch (e) {
       Alert.alert('Could not submit', e instanceof Error ? e.message : 'Try again later.');
     } finally {
@@ -53,11 +49,10 @@ const BusinessPartnershipScreen = ({ onBack }: BusinessPartnershipScreenProps) =
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Business partnership</Text>
-        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
