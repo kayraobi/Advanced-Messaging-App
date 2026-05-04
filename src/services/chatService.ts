@@ -1,40 +1,20 @@
-// This service will be populated once Supabase setup is complete.
-// The following tables need to be created by the backend:
-//   messages  (id, room_id, user_id, content, created_at)
-//   rooms     (id, name, is_global, event_id)
+// Chat işlemleri Socket.IO üzerinden yapılıyor.
+// Gerçek zamanlı bağlantı için socketService.ts kullanılır.
+// Mesaj geçmişi için: GET /api/chat/rooms/:roomId/messages (Ibrahim ekleyince)
 
 export interface Message {
-  id: string;
-  room_id: string;
-  user_id: string;
+  _id: string;
+  roomId: string;
+  senderId: string;
+  senderName: string;
   content: string;
-  created_at: string;
-  user?: {
-    username: string;
-    avatar?: string;
-  };
+  hidden: boolean;
+  createdAt: string;
 }
 
-export const chatService = {
-  // TODO: Supabase client eklenince implement edilecek
-  getMessages: async (_roomId: string): Promise<Message[]> => {
-    return [];
-  },
-
-  sendMessage: async (
-    _roomId: string,
-    _userId: string,
-    _content: string
-  ): Promise<void> => {
-    return;
-  },
-
-  // Realtime subscription — returns an unsubscribe function
-  subscribeToRoom: (
-    _roomId: string,
-    _onMessage: (msg: Message) => void
-  ): (() => void) => {
-    // TODO: supabase.channel() buraya gelecek
-    return () => {};
-  },
-};
+export interface Room {
+  roomId: string;
+  type: 'global' | 'event' | 'dm';
+  lastMessage?: string;
+  lastMessageAt?: string;
+}

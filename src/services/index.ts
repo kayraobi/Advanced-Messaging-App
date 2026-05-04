@@ -1,8 +1,7 @@
 export { newsService } from './newsService';
 export { eventService } from './eventService';
 export { authService } from './authService';
-export { chatService } from './chatService';
-export type { Message } from './chatService';
+export type { Message, Room } from './chatService';
 export { businessService } from './businessService';
 export { sponsorsService } from './sponsorsService';
 export type { Sponsor } from './sponsorsService';

@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   FlatList,
   TextInput,
@@ -11,8 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { socketService } from '../services/socketService';
 
 interface ChatMessage {
   id: string;
@@ -24,17 +25,7 @@ interface ChatMessage {
   hidden?: boolean;
 }
 
-const initialMessages: ChatMessage[] = [
-  { id: '1', sender: 'Anna K.', initials: 'AK', text: 'Hey everyone! Anyone up for coffee this weekend? ☕', time: '10:12 AM', isMe: false },
-  { id: '2', sender: 'Marco R.', initials: 'MR', text: "I'm in! Kibe Mahala or somewhere new?", time: '10:14 AM', isMe: false },
-  { id: '3', sender: 'You', initials: 'TT', text: "Count me in! I've been wanting to try that new place on Ferhadija.", time: '10:15 AM', isMe: true },
-  { id: '4', sender: 'Sara B.', initials: 'SB', text: 'The new one is great, I went last week. Highly recommend the cappuccino 👌', time: '10:17 AM', isMe: false },
-  { id: '5', sender: 'You', initials: 'TT', text: "Perfect, let's do Saturday morning then!", time: '10:18 AM', isMe: true },
-  { id: '6', sender: 'Liam P.', initials: 'LP', text: 'Saturday works for me too. What time?', time: '10:20 AM', isMe: false },
-  { id: '7', sender: 'Anna K.', initials: 'AK', text: "How about 10 AM? Not too early 😄", time: '10:22 AM', isMe: false },
-  { id: '8', sender: 'Marco R.', initials: 'MR', text: 'Sounds perfect. See you all there! 🎉', time: '10:23 AM', isMe: false },
-  { id: '9', sender: 'Unknown', initials: '??', text: '🛡️ [Message hidden by AI Auto-Moderator]', time: '10:25 AM', isMe: false, hidden: true },
-];
+const GLOBAL_ROOM_ID = 'global';
 
 const pollOptions = [
   { label: 'Saturday Evening', votes: 18 },
@@ -46,23 +37,72 @@ const totalVotes = pollOptions.reduce((s, o) => s + o.votes, 0);
 const GlobalChatScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
+  const [currentUser, setCurrentUser] = useState<{ _id: string; username: string } | null>(null);
+  const flatListRef = useRef<FlatList>(null);
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        sender: 'You',
-        initials: 'TT',
-        text: input.trim(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: true,
-      },
-    ]);
+  // Giriş yapan kullanıcıyı oku
+  useEffect(() => {
+    AsyncStorage.getItem('auth_user').then((raw) => {
+      if (raw) setCurrentUser(JSON.parse(raw));
+    });
+  }, []);
+
+  // Socket bağlantısı ve mesaj dinleme
+  useEffect(() => {
+    let isMounted = true;
+
+    const setup = async () => {
+      const socket = await socketService.connect();
+      socket.emit('join_room', GLOBAL_ROOM_ID);
+
+      socket.on('previous_messages', (msgs: any[]) => {
+        if (!isMounted) return;
+        const formatted = msgs.map((m) => ({
+          id: m._id ?? m.id,
+          sender: m.senderName,
+          initials: m.senderName.substring(0, 2).toUpperCase(),
+          text: m.content,
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: m.senderId === currentUser?._id,
+          hidden: m.hidden ?? false,
+        }));
+        setMessages(formatted);
+      });
+
+      socket.on('receive_message', (m: any) => {
+        if (!isMounted) return;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: m._id ?? m.id,
+            sender: m.senderName,
+            initials: m.senderName.substring(0, 2).toUpperCase(),
+            text: m.content,
+            time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isMe: m.senderId === currentUser?._id,
+            hidden: m.hidden ?? false,
+          },
+        ]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      });
+    };
+
+    setup();
+    return () => { isMounted = false; };
+  }, [currentUser]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || !currentUser) return;
+    const socket = await socketService.connect();
+    socket.emit('send_message', {
+      roomId: GLOBAL_ROOM_ID,
+      senderId: currentUser._id,
+      senderName: currentUser.username,
+      content: input.trim(),
+    });
     setInput('');
   };
 
@@ -119,6 +159,7 @@ const GlobalChatScreen = () => {
 
       {/* Messages */}
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.messages}

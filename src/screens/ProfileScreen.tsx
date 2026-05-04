@@ -16,6 +16,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { authService } from '../services/authService';
+import { storageService } from '../services/storageService';
+import { socketService } from '../services/socketService';
 import { realEstateService } from '../services/realEstateService';
 import type { RealEstate } from '../services/realEstateService';
 import type { User } from '../types/user.types';
@@ -450,7 +452,12 @@ const ProfileScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.logoutConfirm}
-                onPress={() => { setShowLogoutConfirm(false); }}
+                onPress={async () => {
+                  setShowLogoutConfirm(false);
+                  await authService.logout();        // token sil
+                  await storageService.clearAll();   // cache temizle
+                  socketService.disconnect();         // socket bağlantısını kes
+                }}
               >
                 <Text style={styles.logoutConfirmText}>Log Out</Text>
               </TouchableOpacity>
