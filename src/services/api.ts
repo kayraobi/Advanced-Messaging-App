@@ -46,6 +46,15 @@ export const handleError = (error: unknown): never => {
 		const status = error.response?.status;
 		const msg = error.response?.data?.message;
 
+		// Geçici debug — gerçek hatayı görmek için
+		console.log('[API ERROR]', {
+			status,
+			msg,
+			code: error.code,
+			data: JSON.stringify(error.response?.data),
+			message: error.message,
+		});
+
 		if (status === 400) throw new Error(msg ?? "Invalid request.");
 		if (status === 401) throw new Error("Session expired. Please login again.");
 		if (status === 403) throw new Error("You are not authorized.");
@@ -55,6 +64,7 @@ export const handleError = (error: unknown): never => {
 		if (msg) throw new Error(msg);
 		if (error.code === "ECONNABORTED") throw new Error("Request timed out.");
 	}
+	console.log('[API UNKNOWN ERROR]', error);
 	throw new Error("An unexpected error occurred.");
 };
 

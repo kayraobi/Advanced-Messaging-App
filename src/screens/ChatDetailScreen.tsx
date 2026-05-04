@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackScreenProps } from '../navigation/types';
 import {
   View,
   Text,
   TextInput,
-  ScrollView,
   TouchableOpacity,
   FlatList,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { events } from '../data/events';
@@ -119,57 +119,77 @@ const ChatDetailScreen = () => {
   const [input, setInput] = useState('');
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
   const [showPoll, setShowPoll] = useState(true);
+  const [currentUser, setCurrentUser] = useState<{ _id: string; username: string } | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
   const chatTitle = isDm ? dmProfile?.name ?? 'Chat' : event?.title ?? 'Chat';
 
-  React.useEffect(() => {
-    const socket = socketService.connect();
-    socket.emit('join_room', chatId);
+  // Giriş yapan kullanıcıyı AsyncStorage'dan oku
+  useEffect(() => {
+    AsyncStorage.getItem('auth_user').then((raw) => {
+      if (raw) setCurrentUser(JSON.parse(raw));
+    });
+  }, []);
 
-    const handlePrevious = (msgs: any[]) => {
-      const formatted = msgs.map((m) => ({
-        id: m.id,
-        sender: m.senderId === 'me' ? 'You' : m.senderName,
-        initials: m.senderName.substring(0, 2).toUpperCase(),
-        text: m.content,
-        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: m.senderId === 'me',
-      }));
-      setMessages(formatted);
-    };
+  useEffect(() => {
+    let isMounted = true;
 
-    const handleReceive = (m: any) => {
-      const formatted = {
-        id: m.id,
-        sender: m.senderId === 'me' ? 'You' : m.senderName,
-        initials: m.senderName.substring(0, 2).toUpperCase(),
-        text: m.content,
-        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: m.senderId === 'me',
+    const setup = async () => {
+      const socket = await socketService.connect();
+      socket.emit('join_room', chatId);
+
+      const handlePrevious = (msgs: any[]) => {
+        if (!isMounted) return;
+        const formatted = msgs.map((m) => ({
+          id: m._id ?? m.id,
+          sender: m.senderName,
+          initials: m.senderName.substring(0, 2).toUpperCase(),
+          text: m.content,
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: m.senderId === currentUser?._id,
+        }));
+        setMessages(formatted);
       };
-      setMessages((prev) => [...prev, formatted]);
+
+      const handleReceive = (m: any) => {
+        if (!isMounted) return;
+        const formatted = {
+          id: m._id ?? m.id,
+          sender: m.senderName,
+          initials: m.senderName.substring(0, 2).toUpperCase(),
+          text: m.content,
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: m.senderId === currentUser?._id,
+        };
+        setMessages((prev) => [...prev, formatted]);
+        // Yeni mesajda en aşağı kay
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      };
+
+      socket.on('previous_messages', handlePrevious);
+      socket.on('receive_message', handleReceive);
+
+      return () => {
+        socket.off('previous_messages', handlePrevious);
+        socket.off('receive_message', handleReceive);
+      };
     };
 
-    socket.on('previous_messages', handlePrevious);
-    socket.on('receive_message', handleReceive);
+    setup();
+    return () => { isMounted = false; };
+  }, [chatId, currentUser]);
 
-    return () => {
-      socket.off('previous_messages', handlePrevious);
-      socket.off('receive_message', handleReceive);
-    };
-  }, [chatId]);
+  const sendMessage = async () => {
+    if (!input.trim() || !currentUser) return;
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    
-    const socket = socketService.connect();
+    const socket = await socketService.connect();
     socket.emit('send_message', {
       roomId: chatId,
-      senderId: 'me',
-      senderName: 'You',
+      senderId: currentUser._id,
+      senderName: currentUser.username,
       content: input.trim(),
     });
-    
+
     setInput('');
   };
 
@@ -239,6 +259,7 @@ const ChatDetailScreen = () => {
 
       {/* Messages */}
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.messages}

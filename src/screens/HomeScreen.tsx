@@ -19,6 +19,7 @@ import { News } from "../types/news.types";
 import { newsService } from "../services";
 import { eventService } from "../services/eventService";
 import { sponsorsService, Sponsor } from "../services/sponsorsService";
+import { storageService } from "../services/storageService";
 
 const { width } = Dimensions.get("window");
 
@@ -77,6 +78,19 @@ const HomeScreen = () => {
       setIsNewsLoading(true);
       setIsEventsLoading(true);
 
+      // Önce cache'den göster — kullanıcı anında içeriği görür
+      const cachedSlides = await storageService.getStale<any[]>('news_slides');
+      const cachedLatest = await storageService.getStale<any[]>('news_latest');
+      const cachedEvents = await storageService.getStale<any[]>('events_featured');
+
+      if (cachedSlides) setFeaturedNews(cachedSlides.map(toNewsArticle));
+      if (cachedLatest) setLatestNews(cachedLatest.map(toNewsArticle));
+      if (cachedEvents) {
+        setFeaturedEvents(cachedEvents.slice(0, 3));
+        setIsEventsLoading(false);
+      }
+
+      // Arka planda sunucudan taze veriyi çek
       const [slidesResult, latestResult, eventsResult] = await Promise.allSettled([
         newsService.getSlides(),
         newsService.getLatest(),
@@ -86,8 +100,9 @@ const HomeScreen = () => {
       const errs: string[] = [];
       if (slidesResult.status === 'fulfilled') {
         setFeaturedNews(slidesResult.value.map(toNewsArticle));
+        await storageService.set('news_slides', slidesResult.value); // cache'e yaz
       } else {
-        setFeaturedNews([]);
+        if (!cachedSlides) setFeaturedNews([]);
         errs.push(
           slidesResult.reason instanceof Error
             ? slidesResult.reason.message
@@ -104,8 +119,9 @@ const HomeScreen = () => {
             .filter((n) => !slideIds.has(n._id))
             .map(toNewsArticle),
         );
+        await storageService.set('news_latest', latestResult.value); // cache'e yaz
       } else {
-        setLatestNews([]);
+        if (!cachedLatest) setLatestNews([]);
         errs.push(
           latestResult.reason instanceof Error
             ? latestResult.reason.message
@@ -117,8 +133,9 @@ const HomeScreen = () => {
       if (eventsResult.status === 'fulfilled') {
         const data = eventsResult.value;
         setFeaturedEvents(Array.isArray(data) ? data.slice(0, 3) : []);
+        await storageService.set('events_featured', data); // cache'e yaz
       } else {
-        setFeaturedEvents([]);
+        if (!cachedEvents) setFeaturedEvents([]);
       }
 
       setIsNewsLoading(false);
