@@ -112,15 +112,18 @@ const ExploreScreen = () => {
             let chips: PlaceType[] = [];
             try {
               const grouped = await placeTypesService.getWithPlaces();
+              // API alan adı: name | title | typeName | type — hangisi doluysa onu kullan
+              const resolveName = (g: any): string =>
+                g.name || g.title || g.typeName || g.type || g.label || '';
               chips = grouped.map((g) => ({
                 _id: g._id,
-                name: g.name ?? '',
+                name: resolveName(g),
                 icon: g.icon,
               }));
               flat = grouped.flatMap((g) =>
                 (Array.isArray(g.places) ? g.places : []).map((p) => ({
                   ...p,
-                  placeType: { _id: g._id, name: g.name ?? '' },
+                  placeType: { _id: g._id, name: resolveName(g) },
                 })),
               );
             } catch {
@@ -620,14 +623,24 @@ const ExploreScreen = () => {
                   void (async () => {
                     try {
                       const pt = await placeTypesService.getById(nextId);
-                      const flat = (Array.isArray(pt.places) ? pt.places : []).map((p) => ({
+                      let flat = (Array.isArray(pt.places) ? pt.places : []).map((p) => ({
                         ...p,
                         placeType: { _id: pt._id, name: pt.name ?? '' },
                       }));
+                      // Sunucu embed etmediyse client-side filtrele
+                      if (flat.length === 0) {
+                        const clientFiltered = placesBaselineRef.current.filter((p) => {
+                          const typeId = typeof p.placeType === 'object'
+                            ? (p.placeType as any)?._id
+                            : p.placeType;
+                          return typeId === nextId;
+                        });
+                        setPlaces(clientFiltered.length > 0 ? clientFiltered : placesBaselineRef.current);
+                        return;
+                      }
                       setPlaces(flat);
                     } catch {
                       setPlaces(placesBaselineRef.current);
-                      setActiveTypeFilter(nextId);
                     } finally {
                       setLoading((prev) => ({ ...prev, places: false }));
                     }
@@ -635,7 +648,7 @@ const ExploreScreen = () => {
                 }}
               >
                 <Text style={[styles.filterChipText, { color: active ? '#fff' : colors.mutedForeground }]}>
-                  {type.name}
+                  {type.name || type._id}
                 </Text>
               </TouchableOpacity>
             );

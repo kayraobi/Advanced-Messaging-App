@@ -6,9 +6,9 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -38,6 +38,7 @@ const notifications = [
 
 const AppHeader = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [showNotifs, setShowNotifs] = useState(false);
   const [readIds, setReadIds] = useState<number[]>([]);
 
@@ -50,7 +51,7 @@ const AppHeader = () => {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
-      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+      <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: insets.top + 10 }]}>
         <Text style={styles.title}>Sarajevo Expats</Text>
         <View style={styles.right}>
           <Text style={styles.weather}>⛅ 14°C</Text>

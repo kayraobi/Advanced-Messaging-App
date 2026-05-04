@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { sponsorsService, Sponsor } from '../services/sponsorsService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const sponsorImage = (s: Sponsor) =>
   (s.logo ?? s.displayUrl ?? s.image ?? null) as string | null;
@@ -26,6 +27,7 @@ const SponsorDetailScreen = () => {
   const route = useRoute<RootStackScreenProps<'SponsorDetail'>['route']>();
   const { sponsorId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [sponsor, setSponsor] = useState<Sponsor | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,7 +62,7 @@ const SponsorDetailScreen = () => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>

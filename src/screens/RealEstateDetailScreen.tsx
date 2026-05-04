@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { realEstateService, RealEstate } from '../services/realEstateService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -25,6 +26,7 @@ const RealEstateDetailScreen = () => {
   const route = useRoute<RootStackScreenProps<'RealEstateDetail'>['route']>();
   const listingId = route.params.realEstateId;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [listing, setListing] = useState<RealEstate | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -90,7 +92,7 @@ const RealEstateDetailScreen = () => {
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={[styles.backBtn, { top: insets.top + 12 }]} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
           {price ? (

@@ -19,6 +19,7 @@ import { usersService } from '../services/usersService';
 import type { User } from '../types/user.types';
 import { servicesService, Service } from '../services/servicesService';
 import { tripsService, Trip } from '../services/tripsService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type AdminTab = 'sponsors' | 'roles' | 'users' | 'services' | 'trips';
 
@@ -27,6 +28,7 @@ const TAB_ORDER: AdminTab[] = ['sponsors', 'roles', 'users', 'services', 'trips'
 const GmAdminScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<AdminTab>('sponsors');
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -461,7 +463,7 @@ const GmAdminScreen = () => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>

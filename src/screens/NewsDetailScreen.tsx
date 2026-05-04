@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { newsService } from '../services/newsService';
 import type { News } from '../types/news.types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const stripHtml = (html: string): string =>
   html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -23,6 +24,7 @@ const NewsDetailScreen = () => {
   const route = useRoute<RootStackScreenProps<'NewsDetail'>['route']>();
   const { newsId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [item, setItem] = useState<News | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ const NewsDetailScreen = () => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>

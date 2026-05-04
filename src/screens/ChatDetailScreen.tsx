@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { events } from '../data/events';
 import { socketService } from '../services/socketService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ChatMessage {
   id: string;
@@ -111,6 +112,7 @@ const ChatDetailScreen = () => {
   const route = useRoute<RootStackScreenProps<'ChatDetail'>['route']>();
   const { chatId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const isDm = chatId.startsWith('dm-');
   const dmProfile = isDm ? dmProfiles[chatId] : null;
   const event = !isDm ? events.find((e) => e.id === chatId) : null;
@@ -200,7 +202,7 @@ const ChatDetailScreen = () => {
       keyboardVerticalOffset={0}
     >
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>

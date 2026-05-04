@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { eventService } from "../services/eventService";
-import { parse, isAfter, isBefore, startOfDay, format } from "date-fns";
+import { parse, isAfter, isBefore, startOfDay, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 const CalendarScreen = () => {
 	const navigation = useNavigation();
@@ -62,32 +62,87 @@ const CalendarScreen = () => {
 			windowSize={5}
 			ListHeaderComponent={
 				<>
-					{/* Filters */}
+					{/* Filter buttons row */}
 					<View style={styles.filters}>
 						<TouchableOpacity
+							onPress={() => setShowDatePicker(showDatePicker === 'from' ? null : 'from')}
 							style={[
 								styles.filterBtn,
-								{ backgroundColor: colors.card, borderColor: colors.border },
+								{
+									backgroundColor: fromDate ? colors.primary + '15' : colors.card,
+									borderColor: fromDate ? colors.primary : colors.border,
+								},
 							]}
 						>
-							<Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
-							<Text style={[styles.filterBtnText, { color: fromDate ? colors.foreground : colors.mutedForeground }]}>
+							<Ionicons name="calendar-outline" size={14} color={fromDate ? colors.primary : colors.mutedForeground} />
+							<Text style={[styles.filterBtnText, { color: fromDate ? colors.primary : colors.mutedForeground }]}>
 								{fromDate ? format(fromDate, "MMM d") : "From"}
 							</Text>
+							{fromDate && (
+								<TouchableOpacity onPress={() => { setFromDate(undefined); setShowDatePicker(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+									<Ionicons name="close-circle" size={14} color={colors.primary} />
+								</TouchableOpacity>
+							)}
 						</TouchableOpacity>
 
 						<TouchableOpacity
+							onPress={() => setShowDatePicker(showDatePicker === 'to' ? null : 'to')}
 							style={[
 								styles.filterBtn,
-								{ backgroundColor: colors.card, borderColor: colors.border },
+								{
+									backgroundColor: toDate ? colors.primary + '15' : colors.card,
+									borderColor: toDate ? colors.primary : colors.border,
+								},
 							]}
 						>
-							<Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
-							<Text style={[styles.filterBtnText, { color: toDate ? colors.foreground : colors.mutedForeground }]}>
+							<Ionicons name="calendar-outline" size={14} color={toDate ? colors.primary : colors.mutedForeground} />
+							<Text style={[styles.filterBtnText, { color: toDate ? colors.primary : colors.mutedForeground }]}>
 								{toDate ? format(toDate, "MMM d") : "To"}
 							</Text>
+							{toDate && (
+								<TouchableOpacity onPress={() => { setToDate(undefined); setShowDatePicker(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+									<Ionicons name="close-circle" size={14} color={colors.primary} />
+								</TouchableOpacity>
+							)}
 						</TouchableOpacity>
+
+						{(fromDate || toDate) && (
+							<TouchableOpacity
+								onPress={() => { setFromDate(undefined); setToDate(undefined); setShowDatePicker(null); }}
+								style={[styles.filterBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
+							>
+								<Text style={[styles.filterBtnText, { color: colors.mutedForeground }]}>Clear all</Text>
+							</TouchableOpacity>
+						)}
 					</View>
+
+					{/* Quick-preset picker */}
+					{showDatePicker && (
+						<View style={[styles.presetBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+							<Text style={[styles.presetTitle, { color: colors.mutedForeground }]}>
+								{showDatePicker === 'from' ? 'Start date' : 'End date'}
+							</Text>
+							{[
+								{ label: 'Today',       from: startOfDay(new Date()),         to: startOfDay(new Date()) },
+								{ label: 'This week',   from: startOfWeek(new Date()),        to: endOfWeek(new Date()) },
+								{ label: 'This month',  from: startOfMonth(new Date()),       to: endOfMonth(new Date()) },
+								{ label: 'Next 30 days',from: startOfDay(new Date()),         to: addDays(new Date(), 30) },
+							].map(({ label, from, to }) => (
+								<TouchableOpacity
+									key={label}
+									onPress={() => {
+										if (showDatePicker === 'from') setFromDate(from);
+										else setToDate(to);
+										setShowDatePicker(null);
+									}}
+									style={[styles.presetOption, { borderBottomColor: colors.border }]}
+								>
+									<Text style={[styles.presetOptionText, { color: colors.foreground }]}>{label}</Text>
+									<Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} />
+								</TouchableOpacity>
+							))}
+						</View>
+					)}
 
 					<View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
 						<Text style={[styles.count, { color: colors.mutedForeground }]}>
@@ -196,6 +251,31 @@ const styles = StyleSheet.create({
 		gap: 8,
 	},
 	emptyText: { fontSize: 14 },
+	presetBox: {
+		marginHorizontal: 16,
+		marginBottom: 10,
+		borderRadius: 12,
+		borderWidth: 1,
+		overflow: 'hidden',
+	},
+	presetTitle: {
+		fontSize: 11,
+		fontWeight: '600',
+		paddingHorizontal: 14,
+		paddingTop: 10,
+		paddingBottom: 6,
+		textTransform: 'uppercase',
+		letterSpacing: 0.5,
+	},
+	presetOption: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 14,
+		paddingVertical: 12,
+		borderBottomWidth: 1,
+	},
+	presetOptionText: { fontSize: 14, fontWeight: '500' },
 });
 
 export default CalendarScreen;

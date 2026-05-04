@@ -21,6 +21,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { eventService } from '../services/eventService';
 import type { Event, EventChildPost } from '../types/event.types';
 import { contentToPlainLines, eventInstagramUrl } from '../utils/eventPresentation';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -31,6 +32,7 @@ const EventDetailScreen = () => {
   const route = useRoute<RootStackScreenProps<'EventDetail'>['route']>();
   const { eventId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -118,7 +120,7 @@ const EventDetailScreen = () => {
             </View>
           )}
           <View style={styles.coverGradient} />
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={[styles.backBtn, { top: insets.top + 12 }]} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
         </View>

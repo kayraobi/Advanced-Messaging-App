@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { placesService, Place } from '../services/placesService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -26,6 +27,7 @@ const PlaceDetailScreen = () => {
   const route = useRoute<RootStackScreenProps<'PlaceDetail'>['route']>();
   const { placeId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [place, setPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -78,7 +80,7 @@ const PlaceDetailScreen = () => {
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={[styles.backBtn, { top: insets.top + 12 }]} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
         </View>

@@ -8,12 +8,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { servicesService, Service } from '../services/servicesService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ServiceDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RootStackScreenProps<'ServiceDetail'>['route']>();
   const { serviceId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -72,7 +74,7 @@ const ServiceDetailScreen = () => {
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={[styles.backBtn, { top: insets.top + 12 }]} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
         </View>
