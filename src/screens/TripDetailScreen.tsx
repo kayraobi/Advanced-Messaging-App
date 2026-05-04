@@ -9,12 +9,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { tripsService, Trip, TripApplication } from '../services/tripsService';
 import { authService } from '../services/authService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TripDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RootStackScreenProps<'TripDetail'>['route']>();
   const { tripId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
@@ -107,7 +109,7 @@ const TripDetailScreen = () => {
             </View>
           )}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={[styles.backBtn, { top: insets.top + 12 }]} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color="#333" />
           </TouchableOpacity>
           {price ? (

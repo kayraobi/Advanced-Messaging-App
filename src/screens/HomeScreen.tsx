@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigation } from "@react-navigation/native";
 import {
 	View,
@@ -59,6 +59,17 @@ const HomeScreen = () => {
 	const [sponsors, setSponsors] = useState<Sponsor[]>([]);
 	const [isSponsorsLoading, setIsSponsorsLoading] = useState<boolean>(true);
 	const flatListRef = useRef<FlatList>(null);
+
+	// Filter latest news by search query
+	const filteredLatestNews = useMemo(() => {
+		if (!searchQuery.trim()) return latestNews;
+		const q = searchQuery.toLowerCase();
+		return latestNews.filter(
+			(n) =>
+				n.title.toLowerCase().includes(q) ||
+				n.snippet.toLowerCase().includes(q),
+		);
+	}, [latestNews, searchQuery]);
 
 	const sponsorThumb = (s: Sponsor) =>
 		(s.logo ?? s.displayUrl ?? s.image ?? null) as string | null;
@@ -462,13 +473,20 @@ const HomeScreen = () => {
 					LATEST NEWS
 				</Text>
 				<FlatList
-					data={latestNews}
+					data={filteredLatestNews}
 					keyExtractor={(item) => item.id}
 					scrollEnabled={false}
 					ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
 					initialNumToRender={5}
 					maxToRenderPerBatch={5}
 					windowSize={3}
+					ListEmptyComponent={
+						searchQuery.trim() ? (
+							<Text style={{ color: colors.mutedForeground, fontSize: 13, paddingVertical: 8 }}>
+								No results for "{searchQuery}"
+							</Text>
+						) : null
+					}
 					renderItem={({ item: article }) => (
 						<NewsCard
 							article={article}

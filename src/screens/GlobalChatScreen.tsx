@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
 import {
   View,
   Text,
@@ -10,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -35,8 +38,9 @@ const pollOptions = [
 const totalVotes = pollOptions.reduce((s, o) => s + o.votes, 0);
 
 const GlobalChatScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [currentUser, setCurrentUser] = useState<{ _id: string; username: string } | null>(null);
@@ -112,8 +116,14 @@ const GlobalChatScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border, paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+          }
+        }}>
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -203,7 +213,7 @@ const GlobalChatScreen = () => {
       />
 
       {/* Input */}
-      <View style={[styles.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+      <View style={[styles.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: insets.bottom || 12 }]}>
         <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.muted }]}>
           <Ionicons name="attach-outline" size={18} color={colors.mutedForeground} />
         </TouchableOpacity>

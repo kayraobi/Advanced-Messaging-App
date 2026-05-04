@@ -67,6 +67,8 @@ export const authService = {
         { emailOrUsername: normalizedIdentifier, password: normalizedPassword },
       ];
 
+      // Sadece /api/users/login — Ibrahim'in sunucusu bu endpoint'i kullanıyor.
+      // İlk payload {email, password} çalışıyorsa direkt geç, 401 gelirse dur.
       let res: { data: any } | null = null;
       let lastError: unknown = null;
 
@@ -76,25 +78,10 @@ export const authService = {
           break;
         } catch (e) {
           lastError = e;
-          // Network / timeout gibi durumlarda gereksiz tekrar yapma.
-          if (e instanceof AxiosError && !e.response) {
-            throw e;
-          }
-        }
-      }
-
-      if (!res) {
-        // Backward compatibility for local mock backend.
-        for (const payload of payloadVariants) {
-          try {
-            res = await api.post<LoginResponse>('/api/auth/login', payload);
-            break;
-          } catch (e) {
-            lastError = e;
-            if (e instanceof AxiosError && !e.response) {
-              throw e;
-            }
-          }
+          // Network / timeout → direkt hata fırlat
+          if (e instanceof AxiosError && !e.response) throw e;
+          // 401 Unauthorized → şifre yanlış, devam etme
+          if (e instanceof AxiosError && e.response?.status === 401) break;
         }
       }
 

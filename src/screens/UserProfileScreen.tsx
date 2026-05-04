@@ -13,12 +13,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import type { User } from '../types/user.types';
 import { usersService } from '../services/usersService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const UserProfileScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RootStackScreenProps<'UserProfile'>['route']>();
   const { userId } = route.params;
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ const UserProfileScreen = () => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color={colors.foreground} />
         </TouchableOpacity>
