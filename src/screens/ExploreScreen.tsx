@@ -12,7 +12,6 @@ import { servicesService, Service } from '../services/servicesService';
 import { tripsService, Trip } from '../services/tripsService';
 import { placeTypesService, PlaceType } from '../services/placeTypesService';
 import { serviceTypesService, ServiceType } from '../services/serviceTypesService';
-import { storageService } from '../services/storageService';
 
 type ExploreTab = 'places' | 'realEstate' | 'services' | 'trips';
 
@@ -93,21 +92,6 @@ const ExploreScreen = () => {
         setLoading((prev) => ({ ...prev, places: true }));
         (async () => {
           try {
-            // Önce cache'den göster
-            const cachedPlaces = await storageService.getStale<Place[]>('places');
-            const cachedPlaceTypes = await storageService.getStale<PlaceType[]>('placeTypes');
-            if (cachedPlaces && cachedPlaceTypes) {
-              setPlaces(cachedPlaces);
-              setPlaceTypes(cachedPlaceTypes);
-              placesBaselineRef.current = cachedPlaces;
-              setLoading((prev) => ({ ...prev, places: false }));
-              const stale = await storageService.isStale('places');
-              if (!stale) {
-                setLoaded((prev) => new Set(prev).add('places'));
-                return; // break yerine return kullan (async fonksiyon içinde)
-              }
-            }
-
             let flat: Place[] = [];
             let chips: PlaceType[] = [];
             try {
@@ -138,8 +122,6 @@ const ExploreScreen = () => {
             setPlaceTypes(chips);
             placesBaselineRef.current = flat;
             setPlaces(flat);
-            await storageService.set('places', flat);
-            await storageService.set('placeTypes', chips);
             setLoaded((prev) => new Set(prev).add('places'));
             setErrors((prev) => ({ ...prev, places: null }));
           } catch (e: any) {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigation } from "@react-navigation/native";
 import {
 	View,
@@ -11,24 +11,16 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
-import { eventService } from "../services/eventService";
+import { useEvents } from '../hooks/useEvents';
 import { parse, isAfter, isBefore, startOfDay, format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 const CalendarScreen = () => {
 	const navigation = useNavigation();
 	const { colors } = useTheme();
-	const [events, setEvents] = useState<any[]>([]);
-	const [loading, setLoading] = useState(true);
+	const { data: events = [], isLoading: loading } = useEvents();
 	const [fromDate, setFromDate] = useState<Date | undefined>();
 	const [toDate, setToDate] = useState<Date | undefined>();
 	const [showDatePicker, setShowDatePicker] = useState<"from" | "to" | null>(null);
-
-	useEffect(() => {
-		eventService.getAll()
-			.then(setEvents)
-			.catch(console.error)
-			.finally(() => setLoading(false));
-	}, []);
 
 	const filtered = useMemo(() => {
 		return events.filter((e) => {
