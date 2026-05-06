@@ -1,273 +1,349 @@
+<div align="center">
+
+<img src="assets/icon.png" width="100" alt="Sarajevo Expats Logo" />
+
 # Sarajevo Expats
 
-Mobile-first messaging and community management platform for the Sarajevo Expats community.
+**A mobile-first community platform for the Sarajevo expat community**
 
-This project is being developed as the CS308 Software Engineering course project at the International University of Sarajevo. It replaces fragmented WhatsApp-based communication and manual Excel RSVP tracking with a structured mobile experience for community news, event discovery, participation management, and real-time chat.
+[![Expo](https://img.shields.io/badge/Expo-54.0-black?logo=expo&logoColor=white)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-0.81-blue?logo=react)](https://reactnative.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Node.js](https://img.shields.io/badge/Node.js-Express-green?logo=node.js)](https://nodejs.org)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8-black?logo=socket.io)](https://socket.io)
 
-## Project Vision
+*CS308 Software Engineering — International University of Sarajevo, Spring 2025–2026*
 
-Sarajevo Expats is designed to solve three main coordination problems described in the project proposal:
+</div>
 
-- WhatsApp group limits and fragmented communication
-- important event information getting lost in noisy chat streams
-- manual RSVP and attendance tracking through spreadsheets
+---
 
-The goal is to centralize:
+## Overview
 
-- daily community news
-- event discovery and RSVP
-- waitlist and capacity handling
-- global and event-based messaging
-- user profile and participation tracking
+Sarajevo Expats replaces fragmented WhatsApp coordination and manual Excel RSVP tracking with a structured, mobile-first platform. The app gives the Sarajevo expat community a single place for daily news, event discovery, RSVP management, real-time chat, explore listings, and personal profile tracking.
 
-## Proposal Alignment
+| Problem | Solution |
+|---|---|
+| WhatsApp group limits & noise | Structured news feed + dedicated chat rooms |
+| Events buried in chat streams | Calendar with filtering, capacity visibility & countdowns |
+| Manual RSVP via spreadsheets | In-app RSVP with automatic waitlist handling |
+| No central place directory | Explore screen with places, real estate, services & trips |
 
-This README follows the scope and direction defined in:
+---
 
-- `cs308_proposal.pdf`
+## Features
 
-Key proposal themes reflected in the current codebase:
+### For Community Members
+- **Daily News Hub** — curated community news with live search filtering
+- **Event Discovery** — browse, filter by date range or category, see capacity & countdowns
+- **RSVP & Waitlist** — one-tap join with automatic waitlist placement when full
+- **Real-Time Chat** — global community chat and per-event chat rooms via Socket.IO
+- **Explore** — places, real estate, services, and trip listings with type-chip filtering
+- **User Profile** — interests, attended events, edit personal details
 
-- Daily News Hub
-- Smart Event Discovery
-- Event RSVP and event detail flows
-- Global Community Chat
-- Event-specific chat channels
-- User profiles and personalized tracking
+### For GM / Organisers
+- **GM Admin Panel** — create and manage events, inspect participant lists
+- **Submit Place / Real Estate** — add community-relevant listings directly from the app
+- **Business Partnership** — sponsorship and partnership enquiry flow
 
-## Current App Structure
+### Platform
+- **Dark & Light theme** — system-aware with manual toggle in Settings
+- **Dynamic Island / notch safe** — all headers respect `useSafeAreaInsets` on iOS 26+
+- **Offline-friendly** — stale-while-revalidate cache returns data instantly even without network
+- **JWT auth** — token stored in AsyncStorage, auto-attached to every request via Axios interceptor
 
-The mobile app is built with Expo + React Native and currently includes the following user-facing areas:
-
-- `Home`
-  - featured news carousel
-  - latest news feed
-  - recommended events
-- `Calendar`
-  - event filtering
-  - event discovery and capacity visibility
-- `Chats`
-  - global community chat
-  - event chat rooms
-  - direct message mock flow
-- `Profile`
-  - My Events
-  - App Settings
-  - FAQ
-  - Edit Interests
-
-## Implemented Navigation Architecture
-
-The project previously used manual state-based screen switching inside `App.tsx`. It now uses a structured React Navigation setup:
-
-- `src/navigation/AppNavigator.tsx`
-- `src/navigation/MainTabNavigator.tsx`
-- `src/navigation/ProfileStackNavigator.tsx`
-- `src/navigation/types.ts`
-
-Current navigation model:
-
-- Root stack
-  - `Auth`
-  - `MainTabs`
-  - `EventDetail`
-  - `ChatDetail`
-  - `GlobalChat`
-- Bottom tabs
-  - `Home`
-  - `Calendar`
-  - `Chats`
-  - `Profile`
-- Profile stack
-  - `ProfileMain`
-  - `MyEvents`
-  - `Settings`
-  - `FAQ`
-
-This makes the app easier to scale and aligns well with the proposal’s multi-flow mobile UX.
-
-## Event Countdown Design
-
-The event detail screen includes a remaining-time bar/chip for event start countdown.
-
-Relevant files:
-
-- `src/screens/EventDetailScreen.tsx`
-- `src/hooks/useEventCountdown.ts`
-- `src/utils/eventDate.ts`
-- `src/data/events.ts`
-
-Why this matters:
-
-- it gives users immediate visibility into how soon an event starts
-- it is written to support both mock data and future API data
-
-Current logic:
-
-- if an event has `startsAt`, it uses that
-- otherwise it falls back to the existing mock `date + time` fields
-
-This makes the transition to real Sarajevo Expats backend data very easy: once the real event payload arrives, the app can map backend fields into `startsAt` without rewriting the UI.
-
-## FAQ Integration
-
-The Profile section now includes an FAQ screen:
-
-- `src/screens/FAQScreen.tsx`
-- `src/data/faqs.ts`
-
-The FAQ screen is intentionally API-ready:
-
-- the UI is already connected to a dedicated FAQ data source
-- the current website Q&A source is referenced through `FAQ_SOURCE_URL`
-- once real FAQ data is provided, only the data source or service layer needs to change
-
-At the moment, the public Q&A page does not expose published questions, so the app shows a clean empty-state while keeping the structure ready for real data.
-
-## Real-Time Messaging
-
-The project includes a socket-based chat integration path for real-time communication.
-
-Relevant files:
-
-- `src/services/socketService.ts`
-- `src/screens/ChatDetailScreen.tsx`
-- `backend/src/socket/chatHandler.ts`
-
-Current capabilities:
-
-- joining chat rooms
-- loading previous room messages
-- sending and receiving messages over Socket.IO
-
-This aligns directly with the proposal’s:
-
-- Global Community Chat
-- Event-Specific Chat Channels
+---
 
 ## Tech Stack
 
-Based on both the proposal and the current repository:
+### Mobile Client
+| Technology | Version | Purpose |
+|---|---|---|
+| React Native | 0.81.5 | Core mobile framework |
+| Expo | 54.0 | Build toolchain & native modules |
+| TypeScript | 5.9 | Type safety across the entire codebase |
+| React Navigation | 7.x | Stack + bottom-tab navigation |
+| Axios | 1.13 | HTTP client with JWT interceptor |
+| Socket.IO Client | 4.8 | Real-time bidirectional chat |
+| AsyncStorage | 2.2 | Token persistence & TTL cache |
+| TanStack Query | 5.0 | Server state management |
+| date-fns | 3.6 | Date formatting & calendar logic |
+| Expo Image Picker | 17.0 | Photo attachment for listings |
+| react-native-maps | 1.27 | Map views in event & place screens |
 
-### Mobile
+### Backend (local dev / mock)
+| Technology | Purpose |
+|---|---|
+| Node.js + Express | REST API server |
+| TypeScript | Typed route handlers and services |
+| Socket.IO | Real-time chat rooms |
+| Mongoose + MongoDB | Data models and persistence |
+| JWT (`jsonwebtoken`) | Token signing and middleware |
+| bcrypt | Password hashing |
+| Helmet | Secure HTTP headers |
+| CORS | Cross-origin policy |
+| express-rate-limit | Brute-force protection |
+| morgan | Request logging |
 
-- React Native
-- Expo
-- TypeScript
-- React Navigation
-- React Query
-- AsyncStorage
-- Socket.IO client
+> The `backend/` folder is a local development server. The production backend is maintained separately by the backend team and reached via `EXPO_PUBLIC_API_URL`.
 
-### Backend
+---
 
-- Node.js
-- Express
-- TypeScript
-- Socket.IO
-- JWT-related auth scaffolding
+## Architecture
 
-### Project / Delivery
+Sarajevo Expats uses a **Layered Client-Server Architecture** with an event-driven real-time subsystem.
 
-- Git
-- GitHub
+```
+┌─────────────────────────────────────────────────────────┐
+│               Presentation Layer                        │
+│        React Native / Expo Mobile Client                │
+│   Screens · Components · Navigation · Theme Context     │
+└──────────────────┬──────────────────────────────────────┘
+                   │  HTTPS + JSON  /  WSS + Socket.IO
+┌──────────────────▼──────────────────────────────────────┐
+│               Communication Layer                       │
+│         Axios (REST)  +  Socket.IO Client               │
+│      JWT interceptor · TTL cache · AsyncStorage         │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────┐
+│           Backend Application Layer                     │
+│   Express API · Middleware · Controllers · Services     │
+│              Socket.IO Chat Handler                     │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────┐
+│               Data Access Layer                         │
+│      EventRepository · ChatRepository · Mongoose        │
+│              MongoDB Atlas                              │
+└─────────────────────────────────────────────────────────┘
+```
 
-The proposal mentions PostgreSQL and Supabase as part of the broader target architecture. The current repository already contains backend scaffolding and service layers that can evolve into that deployment model.
+### Design Patterns
 
-## Running the Project
+| Pattern | Where | Purpose |
+|---|---|---|
+| **Repository** | `backend/src/repositories/` | Decouples data access from business logic |
+| **Service Layer** | `src/services/` · `backend/src/services/` | Centralises business rules, keeps controllers thin |
+| **Observer / Pub-Sub** | `backend/src/socket/chatHandler.ts` | Socket.IO room broadcast without polling |
+| **Singleton-Like Instance** | `src/services/api.ts` · `backend/src/index.ts` | Single Axios instance + single DB/socket connection |
+| **Cache-Aside / Stale-While-Revalidate** | `src/services/storageService.ts` | Show cached data instantly, refresh in background |
+| **DTO / Type Definitions** | `src/types/` | Typed contracts at every layer boundary |
+| **Strategy (RSVP)** | `backend/src/services/eventService.ts` | Direct join vs. waitlist via same `processRsvp()` entry point |
 
-### Mobile app
+---
 
-From the repository root:
+## Project Structure
+
+```
+Advanced-Messaging-App/
+├── src/
+│   ├── screens/              # All user-facing screens
+│   ├── components/           # Shared UI (AppHeader, ScreenHeader, BottomNav…)
+│   ├── services/             # API + business logic layer
+│   │   ├── api.ts            # Axios instance with JWT interceptor
+│   │   ├── authService.ts    # Login, register, getMe, updateMe
+│   │   ├── eventService.ts   # Event CRUD + RSVP
+│   │   ├── chatService.ts    # Chat room operations
+│   │   ├── socketService.ts  # Socket.IO connection with JWT handshake
+│   │   ├── storageService.ts # TTL cache + useCachedFetch hook
+│   │   ├── placesService.ts
+│   │   ├── newsService.ts
+│   │   ├── realEstateService.ts
+│   │   ├── tripsService.ts
+│   │   └── …                 # sponsors, qaas, roles, uploads…
+│   ├── types/                # TypeScript interfaces (User, Event, News…)
+│   ├── contexts/             # ThemeContext (dark/light)
+│   ├── navigation/           # AppNavigator, MainTabNavigator, stacks
+│   └── utils/                # apiUnwrap, eventDate helpers
+├── backend/
+│   └── src/
+│       ├── routes/           # auth, events, places, realEstate, services, trips…
+│       ├── controllers/      # Thin route handlers
+│       ├── services/         # Business logic
+│       ├── repositories/     # eventRepository, chatRepository
+│       ├── socket/           # chatHandler.ts — Socket.IO pub-sub
+│       ├── models/           # Mongoose User, Event, Message
+│       └── middleware/       # authMiddleware (JWT), requireRole
+├── assets/                   # Icons, splash, adaptive icon
+├── app.json                  # Expo config (bundle ID, scheme, plugins)
+└── package.json
+```
+
+### Screens
+
+| Screen | Description |
+|---|---|
+| `AuthScreen` | Login / register with JWT |
+| `SplashScreen` | Animated orange branded splash |
+| `HomeScreen` | News carousel + searchable feed + recommended events |
+| `CalendarScreen` | Events with date-range presets & chip filters |
+| `ExploreScreen` | Places, real estate, services, trips + type-chip filtering |
+| `GlobalChatScreen` | Community-wide Socket.IO chat room |
+| `ChatsScreen` | All available chat rooms list |
+| `ChatDetailScreen` | Per-event or direct-message chat room |
+| `EventDetailScreen` | Full event info, countdown timer, RSVP / waitlist |
+| `PlaceDetailScreen` | Place info + map |
+| `RealEstateDetailScreen` | Listing details |
+| `ServiceDetailScreen` | Community service detail |
+| `TripDetailScreen` | Trip info |
+| `NewsDetailScreen` | Full article view |
+| `SponsorDetailScreen` | Sponsor profile |
+| `ProfileScreen` | User info, interests, stats |
+| `UserProfileScreen` | View another user's profile |
+| `MyEventsScreen` | User's RSVPed events |
+| `SettingsScreen` | Theme toggle, account options |
+| `GmAdminScreen` | Create & manage events (GM role) |
+| `SubmitPlaceScreen` | Add community place (GM role) |
+| `SubmitRealEstateScreen` | Add listing (GM role) |
+| `BusinessPartnershipScreen` | Sponsorship enquiry |
+| `QaasScreen` | Community Q&A / FAQ |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- Expo CLI — `npm install -g expo-cli`
+- iOS Simulator / Android Emulator **or** Expo Go on a physical device
+
+### Mobile App
 
 ```bash
+# Clone the repo
+git clone https://github.com/kayraobi/Advanced-Messaging-App.git
+cd Advanced-Messaging-App
+
+# Install dependencies
 npm install
+
+# Start the Expo dev server
 npx expo start
 ```
 
-Useful shortcuts:
+Press `i` for iOS simulator, `a` for Android emulator, or scan the QR code with Expo Go.
 
 ```bash
-npx expo start --ios
-npx expo start --android
-npx expo start --web
+npx expo start --ios      # iOS only
+npx expo start --android  # Android only
+npx expo start --web      # Web (Metro bundler)
 ```
 
-### Backend
-
-From the `backend` folder:
+### Backend (local dev server)
 
 ```bash
+cd backend
 npm install
-npm run dev
+npm run dev   # starts on http://localhost:3030
 ```
 
-## Environment Variables
+### Environment Variables
 
-The frontend is already structured to work with real backend values through Expo public env variables.
+Create a `.env` file in the project root:
 
-Examples used by the codebase:
+```env
+EXPO_PUBLIC_API_URL=http://localhost:3030
+EXPO_PUBLIC_SOCKET_URL=http://localhost:3030
+EXPO_PUBLIC_USE_MOCK=false
+```
 
-- `EXPO_PUBLIC_API_URL`
-- `EXPO_PUBLIC_SOCKET_URL`
-- `EXPO_PUBLIC_USE_MOCK`
+Set `EXPO_PUBLIC_USE_MOCK=true` to run the app entirely on local mock data without a running backend.
 
-The current pattern is:
+---
 
-- use mock data during early UI development
-- switch to real API values in `.env` when the Sarajevo Expats tokens and endpoints are available
+## Authentication Flow
 
-## Current Status
+1. User submits credentials on `AuthScreen`
+2. `authService.login()` posts to `POST /api/users/login`
+3. Backend validates credentials with bcrypt and returns a signed JWT
+4. Token is stored in AsyncStorage; user object cached locally
+5. `api.ts` interceptor attaches `Authorization: Bearer <token>` to every subsequent request
+6. `socketService.ts` passes the token in the Socket.IO handshake `auth` field
+7. On app start, `getStoredUser()` decodes the JWT to restore the session — clears storage if expired
 
-The project is in an active implementation phase.
+---
 
-Already represented in the app:
+## Caching Strategy
 
-- structured navigation
-- Daily News Hub style home
-- event listing and discovery
-- event detail view
-- countdown-ready event timing
-- global and event-based chat flows
-- profile stack
-- FAQ placeholder wired for future live content
+`storageService.ts` implements a **Cache-Aside / Stale-While-Revalidate** pattern using AsyncStorage:
 
-Planned / proposal-aligned areas for further evolution:
+| Data type | TTL |
+|---|---|
+| Events | 5 minutes |
+| Places / News / Real Estate / Trips | 10 minutes |
+| Chat messages | 2 minutes |
 
-- automated RSVP and waitlist management
-- recommendation engine
-- conflict and scheduling checks
-- weather-aware event alerts
-- AI moderation
-- RBAC
-- deeper backend integration with real Sarajevo Expats data
+**Behaviour on screen open:**
+1. Return cached data immediately (even if stale) → zero perceived loading time
+2. If stale, fetch fresh data in the background and silently update the cache
+3. If network fails entirely, keep showing the last known data as an offline fallback
+
+Use `useCachedFetch` to adopt this in any screen:
+
+```ts
+const { data, loading, refresh } = useCachedFetch('events', eventService.getAll);
+```
+
+---
+
+## Security
+
+- **JWT authentication** — signed tokens, verified by `authMiddleware.ts` before every protected route
+- **Role-based access control** — Guest / Member / GM / Admin roles enforced via `requireRole()` middleware
+- **Helmet** — sets secure HTTP response headers automatically
+- **CORS** — configurable allowed origins
+- **Rate limiting** — 100 requests / 15 minutes / IP via `express-rate-limit`
+- **bcrypt** — passwords hashed in production auth routes
+- **Socket authentication** — JWT token passed in Socket.IO `auth` object during handshake
+
+---
+
+## Roadmap
+
+- [ ] Automated waitlist promotion on cancellation
+- [ ] Push notifications via Expo Notifications
+- [ ] AI chat moderation (`hidden` flag already in the Message model)
+- [ ] Recommendation engine based on user interests
+- [ ] Weather-aware event alerts
+- [ ] Full MongoDB Atlas production deployment
+- [ ] Admin moderation dashboard
+
+---
 
 ## Team
 
-According to the proposal:
+| Name | Student ID | Role |
+|---|---|---|
+| Fatih Bahadır Karakuş | 220302370 | Frontend Developer & Backend Developer |
+| Ömer Faruk Yaşar | 220302323 | Backend Developer & Frontend Developer |
+| Taylan Taşkın | 220302443 | Real-Time Systems & Backend Developer |
+| Kayra Yılmaz | 220302421 | Lead Developer |
+| Ata Arda Kara | 230302007 | Database Engineer |
 
-- Fatih Bahadır Karakuş — Frontend Developer & Backend Developer
-- Ömer Faruk Yaşar — Backend Developer & Frontend Developer
-- Taylan Taşkın — Real-Time Systems & Backend Developer
-- Kayra Yılmaz — Lead Developer
-- Ata Arda Kara — Database Engineer
+**Instructor:** Mirza Selimović &nbsp;|&nbsp; **Lab Assistant:** Adna Dedić &nbsp;|&nbsp; **Course:** CS308 Software Engineering — IUS
 
-## Repository Notes
+---
 
-- root mobile app: Expo / React Native
-- `backend/`: Node.js + Express + Socket.IO backend
-- `src/services/`: API and integration layer
-- `src/navigation/`: app navigation architecture
-- `src/screens/`: user-facing screens
-- `src/data/`: mock and transitional data sources
+## Contributing
 
-## Summary
+This is an academic project. Team members follow a feature-branch workflow:
 
-Sarajevo Expats is a community infrastructure project rather than just a chat app. Its purpose is to give the Sarajevo expat ecosystem a scalable, mobile-first foundation for:
+```bash
+git checkout -b feature/your-feature-name
+git add .
+git commit -m "feat: describe your change"
+git push --set-upstream origin feature/your-feature-name
+```
 
-- communication
-- event participation
-- discovery
-- coordination
+Active development branch: `chat-and-cache-feature`
 
-The current codebase already reflects that direction and is structured to make the transition from mock data to live Sarajevo Expats data straightforward.
+---
+
+<div align="center">
+
+Made with ☕ in Sarajevo &nbsp;·&nbsp; Spring 2026
+
+</div>
