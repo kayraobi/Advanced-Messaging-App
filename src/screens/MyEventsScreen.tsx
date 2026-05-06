@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { eventService } from '../services/eventService';
+import { useMyEvents } from '../hooks/useMyEvents';
 import { contentToPlainLines } from '../utils/eventPresentation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,31 +20,9 @@ const MyEventsScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const list = await eventService.getMyRsvpEvents();
-      setEvents(list);
-    } catch {
-      setEvents([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    void load();
-  }, [load]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    void load();
-  };
+  const { data: events = [], isLoading: loading, isFetching, refetch } = useMyEvents();
+  const refreshing = isFetching && !loading;
+  const onRefresh = () => { refetch(); };
 
   const renderItem = ({ item }: { item: any }) => {
     const title = contentToPlainLines(item.content)[0] ?? 'Event';

@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { authService } from '../services/authService';
-import { storageService } from '../services/storageService';
+import { useQueryClient } from '@tanstack/react-query';
 import { socketService } from '../services/socketService';
 import { realEstateService } from '../services/realEstateService';
 import type { RealEstate } from '../services/realEstateService';
@@ -27,6 +27,7 @@ const allInterests = ['Sports', 'Culture', 'Food & Drink', 'Tech', 'Networking',
 const ProfileScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
+  const queryClient = useQueryClient();
   const [showInterests, setShowInterests] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(['Sports', 'Food & Drink']);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -455,7 +456,7 @@ const ProfileScreen = () => {
                 onPress={async () => {
                   setShowLogoutConfirm(false);
                   await authService.logout();        // token sil
-                  await storageService.clearAll();   // cache temizle
+                  queryClient.clear();               // cache temizle
                   socketService.disconnect();         // socket bağlantısını kes
                 }}
               >

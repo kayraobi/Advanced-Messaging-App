@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { eventService } from '../services/eventService';
+import { useEvents } from '../hooks/useEvents';
 
 const directMessages = [
   { id: 'dm-1', name: 'Yahia (Admin)', initials: 'YA', lastMessage: 'Welcome to the community! Let me know if you need anything.', time: '1m ago', unread: 1 },
@@ -26,15 +26,8 @@ const ChatsScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
   const [tab, setTab] = useState<'groups' | 'dms'>('groups');
-  const [eventList, setEventList] = useState<any[]>([]);
-  const [isEventsLoading, setIsEventsLoading] = useState(true);
-
-  useEffect(() => {
-    eventService.getAll()
-      .then((data) => setEventList(Array.isArray(data) ? data.slice(0, 5) : []))
-      .catch(() => setEventList([]))
-      .finally(() => setIsEventsLoading(false));
-  }, []);
+  const { data: rawEvents = [], isLoading: isEventsLoading } = useEvents();
+  const eventList = useMemo(() => (rawEvents as any[]).slice(0, 5), [rawEvents]);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} showsVerticalScrollIndicator={false}>

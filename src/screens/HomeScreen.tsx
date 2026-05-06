@@ -19,7 +19,10 @@ import { News } from "../types/news.types";
 import { newsService } from "../services";
 import { eventService } from "../services/eventService";
 import { sponsorsService, Sponsor } from "../services/sponsorsService";
-import { storageService } from "../services/storageService";
+import { useNewsSlides } from '../hooks/useNewsSlides';
+import { useLatestNews } from '../hooks/useLatestNews';
+import { useFeaturedEvents } from '../hooks/useFeaturedEvents';
+import { useSponsors } from '../hooks/useSponsors';
 
 const { width } = Dimensions.get("window");
 
@@ -50,14 +53,20 @@ const HomeScreen = () => {
 	const [current, setCurrent] = useState(0);
 	const [showReminder, setShowReminder] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [featuredNews, setFeaturedNews] = useState<NewsArticle[]>([]);
-	const [latestNews, setLatestNews] = useState<NewsArticle[]>([]);
-	const [isNewsLoading, setIsNewsLoading] = useState<boolean>(true);
-	const [newsError, setNewsError] = useState<string | null>(null);
-	const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
-	const [isEventsLoading, setIsEventsLoading] = useState<boolean>(true);
-	const [sponsors, setSponsors] = useState<Sponsor[]>([]);
-	const [isSponsorsLoading, setIsSponsorsLoading] = useState<boolean>(true);
+	const { data: rawSlides = [], isLoading: slidesLoading, isError: slidesError } = useNewsSlides();
+	const { data: rawLatest = [], isLoading: latestLoading, isError: latestError } = useLatestNews();
+	const { data: rawEvents = [], isLoading: isEventsLoading } = useFeaturedEvents();
+	const { data: rawSponsors = [], isLoading: isSponsorsLoading } = useSponsors();
+
+	const isNewsLoading = slidesLoading || latestLoading;
+	const newsError = slidesError || latestError ? 'News could not be loaded.' : null;
+	const featuredNews = useMemo(() => (rawSlides as any[]).map(toNewsArticle), [rawSlides]);
+	const latestNews = useMemo(() => {
+		const slideIds = new Set((rawSlides as any[]).map((n) => n._id));
+		return (rawLatest as any[]).filter((n) => !slideIds.has(n._id)).map(toNewsArticle);
+	}, [rawSlides, rawLatest]);
+	const featuredEvents = useMemo(() => (Array.isArray(rawEvents) ? (rawEvents as any[]).slice(0, 3) : []), [rawEvents]);
+	const sponsors = useMemo(() => (Array.isArray(rawSponsors) ? rawSponsors as Sponsor[] : []), [rawSponsors]);
 	const flatListRef = useRef<FlatList>(null);
 
 	// Filter latest news by search query
@@ -82,97 +91,6 @@ const HomeScreen = () => {
 			return nextIndex;
 		});
 	}, [featuredNews.length]);
-
-  // News and Events are loaded in parallel — they do not block each other
-  useEffect(() => {
-    const loadAll = async () => {
-      setIsNewsLoading(true);
-      setIsEventsLoading(true);
-
-      // Önce cache'den göster — kullanıcı anında içeriği görür
-      const cachedSlides = await storageService.getStale<any[]>('news_slides');
-      const cachedLatest = await storageService.getStale<any[]>('news_latest');
-      const cachedEvents = await storageService.getStale<any[]>('events_featured');
-
-      if (cachedSlides) setFeaturedNews(cachedSlides.map(toNewsArticle));
-      if (cachedLatest) setLatestNews(cachedLatest.map(toNewsArticle));
-      if (cachedEvents) {
-        setFeaturedEvents(cachedEvents.slice(0, 3));
-        setIsEventsLoading(false);
-      }
-
-      // Arka planda sunucudan taze veriyi çek
-      const [slidesResult, latestResult, eventsResult] = await Promise.allSettled([
-        newsService.getSlides(),
-        newsService.getLatest(),
-        eventService.getFeatured().catch(() => eventService.getAll()),
-      ]);
-
-      const errs: string[] = [];
-      if (slidesResult.status === 'fulfilled') {
-        setFeaturedNews(slidesResult.value.map(toNewsArticle));
-        await storageService.set('news_slides', slidesResult.value); // cache'e yaz
-      } else {
-        if (!cachedSlides) setFeaturedNews([]);
-        errs.push(
-          slidesResult.reason instanceof Error
-            ? slidesResult.reason.message
-            : 'Featured news unavailable.',
-        );
-      }
-      if (latestResult.status === 'fulfilled') {
-        const slideIds =
-          slidesResult.status === 'fulfilled'
-            ? new Set(slidesResult.value.map((n) => n._id))
-            : new Set<string>();
-        setLatestNews(
-          latestResult.value
-            .filter((n) => !slideIds.has(n._id))
-            .map(toNewsArticle),
-        );
-        await storageService.set('news_latest', latestResult.value); // cache'e yaz
-      } else {
-        if (!cachedLatest) setLatestNews([]);
-        errs.push(
-          latestResult.reason instanceof Error
-            ? latestResult.reason.message
-            : 'Latest news unavailable.',
-        );
-      }
-      setNewsError(errs.length ? errs.join(' ') : null);
-
-      if (eventsResult.status === 'fulfilled') {
-        const data = eventsResult.value;
-        setFeaturedEvents(Array.isArray(data) ? data.slice(0, 3) : []);
-        await storageService.set('events_featured', data); // cache'e yaz
-      } else {
-        if (!cachedEvents) setFeaturedEvents([]);
-      }
-
-      setIsNewsLoading(false);
-      setIsEventsLoading(false);
-    };
-
-    loadAll();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setIsSponsorsLoading(true);
-      try {
-        const list = await sponsorsService.getAll();
-        if (!cancelled) setSponsors(Array.isArray(list) ? list : []);
-      } catch {
-        if (!cancelled) setSponsors([]);
-      } finally {
-        if (!cancelled) setIsSponsorsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
 	useEffect(() => {
 		if (featuredNews.length === 0) return;
