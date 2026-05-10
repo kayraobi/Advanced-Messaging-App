@@ -76,27 +76,18 @@ const EventDetailScreen = () => {
   );
   const instagramUrl = eventInstagramUrl(event.url);
 
-  const onRsvp = async () => {
+  const onToggleRsvp = async () => {
     setRsvpBusy(true);
     try {
-      await eventService.rsvp(eventId);
-      setHasRsvp(true);
-      Alert.alert("You're in!", 'Find this event under Profile → My Events.');
+      const joined = await eventService.toggleRsvp(eventId);
+      setHasRsvp(joined);
+      if (joined) {
+        Alert.alert("You're in! 🎉", 'Find this event under Profile → My Events.');
+      } else {
+        Alert.alert('RSVP cancelled', 'You have left the event.');
+      }
     } catch (e) {
-      Alert.alert('RSVP failed', e instanceof Error ? e.message : 'Please try again.');
-    } finally {
-      setRsvpBusy(false);
-    }
-  };
-
-  const onCancelRsvp = async () => {
-    setRsvpBusy(true);
-    try {
-      await eventService.cancelRsvp(eventId);
-      setHasRsvp(false);
-      Alert.alert('RSVP cancelled');
-    } catch (e) {
-      Alert.alert('Could not cancel', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert('Error', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setRsvpBusy(false);
     }
@@ -238,31 +229,31 @@ const EventDetailScreen = () => {
           },
         ]}
       >
-        {hasRsvp ? (
-          <TouchableOpacity
-            style={[styles.rsvpBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
-            onPress={onCancelRsvp}
-            disabled={rsvpBusy}
-          >
-            {rsvpBusy ? (
-              <ActivityIndicator color={colors.foreground} />
-            ) : (
-              <Text style={[styles.rsvpBtnText, { color: colors.foreground }]}>Cancel RSVP</Text>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.rsvpBtn, { backgroundColor: colors.primary }]}
-            onPress={onRsvp}
-            disabled={rsvpBusy}
-          >
-            {rsvpBusy ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={[styles.rsvpBtnText, { color: '#fff' }]}>Join event</Text>
-            )}
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[
+            styles.rsvpBtn,
+            hasRsvp
+              ? { borderColor: colors.border, backgroundColor: colors.muted, borderWidth: 1 }
+              : { backgroundColor: colors.primary },
+          ]}
+          onPress={onToggleRsvp}
+          disabled={rsvpBusy}
+        >
+          {rsvpBusy ? (
+            <ActivityIndicator color={hasRsvp ? colors.foreground : '#fff'} />
+          ) : (
+            <>
+              <Ionicons
+                name={hasRsvp ? 'checkmark-circle' : 'calendar-outline'}
+                size={18}
+                color={hasRsvp ? colors.foreground : '#fff'}
+              />
+              <Text style={[styles.rsvpBtnText, { color: hasRsvp ? colors.foreground : '#fff' }]}>
+                {hasRsvp ? 'Cancel RSVP' : 'Join Event'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
     </View>
   );

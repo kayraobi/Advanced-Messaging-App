@@ -416,7 +416,7 @@ const ExploreScreen = () => {
               }}
             >
               <Ionicons name={t.icon as any} size={14} color={active ? color : colors.mutedForeground} />
-              <Text style={[styles.tabText, { color: active ? color : colors.mutedForeground }]}>
+              <Text style={[styles.tabText, { color: active ? color : colors.mutedForeground }]} numberOfLines={1}>
                 {t.label}
               </Text>
             </TouchableOpacity>
@@ -629,8 +629,8 @@ const ExploreScreen = () => {
                   })();
                 }}
               >
-                <Text style={[styles.filterChipText, { color: active ? '#fff' : colors.mutedForeground }]}>
-                  {type.name || type._id}
+                <Text style={[styles.filterChipText, { color: active ? '#fff' : colors.mutedForeground }]} numberOfLines={1}>
+                  {type.name && type.name.trim() ? type.name : (type._id?.slice(-4) ?? 'Type')}
                 </Text>
               </TouchableOpacity>
             );
@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 11 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 60 },
   filterChips: { paddingHorizontal: 16, paddingBottom: 10, gap: 8, flexDirection: 'row', alignItems: 'center' },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, minWidth: 60, alignItems: 'center' },
   filterChipText: { fontSize: 12, fontWeight: '700' },
   quickLink: {
     flexDirection: 'row',

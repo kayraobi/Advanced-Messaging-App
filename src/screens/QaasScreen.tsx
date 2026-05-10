@@ -9,6 +9,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import { qaasService, QaA } from '../services/qaasService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/** API'den gelen <p>...</p> gibi HTML etiketlerini temizler */
+const stripHtml = (html: string): string =>
+  html.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').trim();
+
 const QaasScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
@@ -53,8 +57,8 @@ const QaasScreen = () => {
   };
 
   const filtered = qaas.filter((q) =>
-    q.question.toLowerCase().includes(search.toLowerCase()) ||
-    q.answer.toLowerCase().includes(search.toLowerCase())
+    stripHtml(q.question).toLowerCase().includes(search.toLowerCase()) ||
+    stripHtml(q.answer).toLowerCase().includes(search.toLowerCase())
   );
 
   // Group by categories
@@ -128,7 +132,7 @@ const QaasScreen = () => {
                             activeOpacity={0.7}
                           >
                             <Text style={[styles.question, { color: colors.foreground, flex: 1 }]}>
-                              {qa.question}
+                              {stripHtml(qa.question)}
                             </Text>
                             {detailLoadingId === qa._id && isOpen ? (
                               <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 4 }} />
@@ -144,7 +148,7 @@ const QaasScreen = () => {
                           {isOpen && (
                             <View style={[styles.answerWrap, { borderBottomColor: colors.border }, idx < items.length - 1 && { borderBottomWidth: 1 }]}>
                               <Text style={[styles.answer, { color: colors.mutedForeground }]}>
-                                {qa.answer}
+                                {stripHtml(qa.answer)}
                               </Text>
                             </View>
                           )}

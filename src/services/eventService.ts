@@ -114,10 +114,10 @@ export const eventService = {
     }
   },
 
-  /** POST /api/events/:id/rsvp — join event (requires auth). */
+  /** POST /api/calendar/:id/apply — join event (requires auth). İkinci çağrıda toggle: ayrılır. */
   async rsvp(eventId: string): Promise<void> {
     try {
-      await api.post(`/api/events/${eventId}/rsvp`);
+      await api.post(`/api/calendar/${eventId}/apply`);
       const ids = await getStoredRsvpIds();
       if (!ids.includes(eventId)) {
         ids.unshift(eventId);
@@ -128,12 +128,33 @@ export const eventService = {
     }
   },
 
-  /** DELETE /api/events/:id/rsvp — cancel RSVP. */
+  /** POST /api/calendar/:id/apply — aynı endpoint, toggle: ayrıl. */
   async cancelRsvp(eventId: string): Promise<void> {
     try {
-      await api.delete(`/api/events/${eventId}/rsvp`);
+      await api.post(`/api/calendar/${eventId}/apply`);
       const ids = (await getStoredRsvpIds()).filter((x) => x !== eventId);
       await persistRsvpIds(ids);
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
+  /**
+   * POST /api/calendar/:id/apply — tek endpoint, toggle mekanizması.
+   * Katılmışsa ayrılır, katılmamışsa katılır. Local storage'ı otomatik günceller.
+   */
+  async toggleRsvp(eventId: string): Promise<boolean> {
+    try {
+      await api.post(`/api/calendar/${eventId}/apply`);
+      const ids = await getStoredRsvpIds();
+      const alreadyJoined = ids.includes(eventId);
+      if (alreadyJoined) {
+        await persistRsvpIds(ids.filter((x) => x !== eventId));
+        return false; // ayrıldı
+      } else {
+        await persistRsvpIds([eventId, ...ids]);
+        return true; // katıldı
+      }
     } catch (e) {
       throw handleError(e);
     }
