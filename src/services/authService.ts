@@ -138,11 +138,7 @@ export const authService = {
     if (USE_MOCK) return;
 
     try {
-      try {
-        await api.post('/api/users', data);
-      } catch {
-        await api.post('/api/auth/register', data);
-      }
+      await api.post('/api/users', data);
     } catch (e) {
       throw handleError(e);
     }
