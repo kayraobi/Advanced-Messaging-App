@@ -9,25 +9,27 @@ export const socketService = {
   async connect(): Promise<Socket> {
     if (socket && socket.connected) return socket;
 
-    // AsyncStorage'dan token oku, sunucuya gönder
     const token = await AsyncStorage.getItem('auth_token');
 
     socket = io(BASE_URL, {
-      transports: ['websocket'],
-      autoConnect: true,
+      path: '/api/socket.io/',
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
       auth: { token: token ?? '' },
     });
 
     socket.on('connect', () => {
-      console.log('[Socket] Bağlandı:', socket?.id);
+      console.log('[Socket] Connected:', socket?.id);
     });
 
     socket.on('connect_error', (err) => {
-      console.warn('[Socket] Bağlantı hatası:', err.message);
+      console.warn('[Socket] Connection error:', err.message);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[Socket] Bağlantı kesildi:', reason);
+      console.log('[Socket] Disconnected:', reason);
     });
 
     return socket;
@@ -42,5 +44,25 @@ export const socketService = {
 
   getSocket(): Socket | null {
     return socket;
+  },
+
+  joinRoom(roomId: string, callback?: (response: any) => void): void {
+    socket?.emit('join_room', { roomId }, callback);
+  },
+
+  leaveRoom(roomId: string, callback?: (response: any) => void): void {
+    socket?.emit('leave_room', { roomId }, callback);
+  },
+
+  sendMessage(roomId: string, message: string, callback?: (response: any) => void): void {
+    socket?.emit('send_message', { roomId, message }, callback);
+  },
+
+  on(event: string, callback: (...args: any[]) => void): void {
+    socket?.on(event, callback);
+  },
+
+  off(event: string, callback?: (...args: any[]) => void): void {
+    socket?.off(event, callback);
   },
 };

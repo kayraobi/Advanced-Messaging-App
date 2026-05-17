@@ -1,20 +1,62 @@
-// Chat işlemleri Socket.IO üzerinden yapılıyor.
-// Gerçek zamanlı bağlantı için socketService.ts kullanılır.
-// Mesaj geçmişi için: GET /api/chat/rooms/:roomId/messages (Ibrahim ekleyince)
+import api from './api';
 
 export interface Message {
   _id: string;
   roomId: string;
   senderId: string;
   senderName: string;
-  content: string;
-  hidden: boolean;
+  message: string;
+  isDeleted?: boolean;
   createdAt: string;
 }
 
 export interface Room {
-  roomId: string;
+  _id: string;
+  name: string;
   type: 'global' | 'event' | 'dm';
-  lastMessage?: string;
-  lastMessageAt?: string;
+  eventId?: string;
+  participants?: string[];
+  participantNames?: Record<string, string>;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
+
+export function getDmPeerName(room: Room, myUserId: string): string {
+  if (!room.participantNames) return room.name;
+  const peerId = room.participants?.find((id) => id !== myUserId);
+  return peerId ? (room.participantNames[peerId] ?? room.name) : room.name;
+}
+
+export const chatService = {
+  getRooms: async (): Promise<Room[]> => {
+    const res = await api.get<Room[]>('/api/chat/rooms');
+    return Array.isArray(res.data) ? res.data : (res.data as any)?.data ?? [];
+  },
+
+  getDmRooms: async (myUserId: string): Promise<Room[]> => {
+    const res = await api.get<Room[]>('/api/chat/rooms', {
+      params: { userId: myUserId },
+    });
+    return Array.isArray(res.data) ? res.data : (res.data as any)?.data ?? [];
+  },
+
+  getOrCreateDmRoom: async (
+    targetUserId: string,
+    targetUsername: string,
+  ): Promise<Room> => {
+    const res = await api.post<Room>('/api/chat/dm', { targetUserId, targetUsername });
+    return res.data;
+  },
+
+  getRoomMessages: async (
+    roomId: string,
+    limit = 30,
+    skip = 0,
+  ): Promise<{ messages: Message[]; totalCount: number; hasMore: boolean }> => {
+    const res = await api.get(`/api/chat/rooms/${roomId}/messages`, {
+      params: { limit, skip },
+    });
+    return res.data;
+  },
+};
