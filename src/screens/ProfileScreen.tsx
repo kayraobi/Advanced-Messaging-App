@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
-import { useQueryClient } from '@tanstack/react-query';
 import { socketService } from '../services/socketService';
+import { useQueryClient } from '@tanstack/react-query';
 import { realEstateService } from '../services/realEstateService';
 import type { RealEstate } from '../services/realEstateService';
 import type { User } from '../types/user.types';
@@ -27,6 +28,7 @@ const allInterests = ['Sports', 'Culture', 'Food & Drink', 'Tech', 'Networking',
 const ProfileScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
+  const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [showInterests, setShowInterests] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(['Sports', 'Food & Drink']);
@@ -455,9 +457,8 @@ const ProfileScreen = () => {
                 style={styles.logoutConfirm}
                 onPress={async () => {
                   setShowLogoutConfirm(false);
-                  await authService.logout();        // token sil
-                  queryClient.clear();               // cache temizle
-                  socketService.disconnect();         // socket bağlantısını kes
+                  queryClient.clear();
+                  await logout();
                 }}
               >
                 <Text style={styles.logoutConfirmText}>Log Out</Text>
