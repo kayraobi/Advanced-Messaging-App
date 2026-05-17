@@ -3,6 +3,7 @@ import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { SplashScreen, AuthScreen } from '../screens';
 import MainTabs from './MainTabs';
 import type { RootStackParamList } from './types';
@@ -30,8 +31,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   const { colors } = useTheme();
+  const { isLoggedIn, login } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // ---- Splash (shown before NavigationContainer mounts) ----
   if (showSplash) {
@@ -73,7 +74,7 @@ export default function AppNavigator() {
           </>
         ) : (
           <Stack.Screen name="Auth">
-            {() => <AuthScreen onLogin={() => setIsLoggedIn(true)} />}
+            {() => <AuthScreen onLogin={login} />}
           </Stack.Screen>
         )}
       </Stack.Navigator>
