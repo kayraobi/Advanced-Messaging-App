@@ -101,15 +101,16 @@ const GlobalChatScreen = () => {
       return () => {
         socketService.off('previous_messages', handlePrevious);
         socketService.off('receive_message', handleReceive);
+        socketService.leaveRoom(roomId);
       };
     };
 
-    let cleanup: (() => void) | undefined;
-    setup().then((fn) => { cleanup = fn; });
+    let cleanupFn: (() => void) | undefined;
+    const promise = setup().then((fn) => { cleanupFn = fn; });
 
     return () => {
       isMounted = false;
-      cleanup?.();
+      promise.then(() => cleanupFn?.());
     };
   }, [roomId, currentUser]);
 
