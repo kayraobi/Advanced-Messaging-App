@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { socketService } from '../services/socketService';
+import { useGlobalRoom } from '../hooks/useChatRooms';
 
 interface ChatMessage {
   id: string;
@@ -27,8 +28,6 @@ interface ChatMessage {
   isMe: boolean;
   hidden?: boolean;
 }
-
-const GLOBAL_ROOM_ID = 'global';
 
 const pollOptions = [
   { label: 'Saturday Evening', votes: 18 },
@@ -47,66 +46,77 @@ const GlobalChatScreen = () => {
   const flatListRef = useRef<FlatList>(null);
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
 
-  // Giriş yapan kullanıcıyı oku
+  const { globalRoom } = useGlobalRoom();
+  const roomId = globalRoom?._id;
+
   useEffect(() => {
     AsyncStorage.getItem('auth_user').then((raw) => {
       if (raw) setCurrentUser(JSON.parse(raw));
     });
   }, []);
 
-  // Socket bağlantısı ve mesaj dinleme
   useEffect(() => {
+    if (!roomId) return;
     let isMounted = true;
 
     const setup = async () => {
-      const socket = await socketService.connect();
-      socket.emit('join_room', GLOBAL_ROOM_ID);
+      await socketService.connect();
 
-      socket.on('previous_messages', (msgs: any[]) => {
+      const handlePrevious = (data: { roomId: string; messages: any[] }) => {
         if (!isMounted) return;
+        const msgs = Array.isArray(data) ? data : data.messages ?? [];
         const formatted = msgs.map((m) => ({
           id: m._id ?? m.id,
           sender: m.senderName,
-          initials: m.senderName.substring(0, 2).toUpperCase(),
-          text: m.content,
+          initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
+          text: m.message ?? m.content ?? '',
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isMe: m.senderId === currentUser?._id,
-          hidden: m.hidden ?? false,
+          hidden: m.hidden ?? m.isDeleted ?? false,
         }));
         setMessages(formatted);
-      });
+      };
 
-      socket.on('receive_message', (m: any) => {
+      const handleReceive = (m: any) => {
         if (!isMounted) return;
         setMessages((prev) => [
           ...prev,
           {
             id: m._id ?? m.id,
             sender: m.senderName,
-            initials: m.senderName.substring(0, 2).toUpperCase(),
-            text: m.content,
+            initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
+            text: m.message ?? m.content ?? '',
             time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             isMe: m.senderId === currentUser?._id,
-            hidden: m.hidden ?? false,
+            hidden: m.hidden ?? m.isDeleted ?? false,
           },
         ]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-      });
+      };
+
+      socketService.on('previous_messages', handlePrevious);
+      socketService.on('receive_message', handleReceive);
+      socketService.joinRoom(roomId);
+
+      return () => {
+        socketService.off('previous_messages', handlePrevious);
+        socketService.off('receive_message', handleReceive);
+      };
     };
 
-    setup();
-    return () => { isMounted = false; };
-  }, [currentUser]);
+    let cleanup: (() => void) | undefined;
+    setup().then((fn) => { cleanup = fn; });
+
+    return () => {
+      isMounted = false;
+      cleanup?.();
+    };
+  }, [roomId, currentUser]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !currentUser) return;
-    const socket = await socketService.connect();
-    socket.emit('send_message', {
-      roomId: GLOBAL_ROOM_ID,
-      senderId: currentUser._id,
-      senderName: currentUser.username,
-      content: input.trim(),
-    });
+    if (!input.trim() || !roomId) return;
+    await socketService.connect();
+    socketService.sendMessage(roomId, input.trim());
     setInput('');
   };
 

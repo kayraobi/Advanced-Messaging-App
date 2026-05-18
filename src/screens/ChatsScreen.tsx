@@ -1,36 +1,112 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
+  Modal,
+  TextInput,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../contexts/ThemeContext';
 import { useEvents } from '../hooks/useEvents';
-
-const directMessages = [
-  { id: 'dm-1', name: 'Yahia (Admin)', initials: 'YA', lastMessage: 'Welcome to the community! Let me know if you need anything.', time: '1m ago', unread: 1 },
-  { id: 'dm-2', name: 'Amar Kovačević', initials: 'AK', lastMessage: 'Are you coming to the basketball game?', time: '10m ago', unread: 2 },
-  { id: 'dm-3', name: 'Hana Begović', initials: 'HB', lastMessage: 'Thanks for the restaurant recommendation! 😊', time: '30m ago', unread: 0 },
-  { id: 'dm-4', name: 'Kayra Tanović', initials: 'KT', lastMessage: "Let's grab coffee sometime this week", time: '2h ago', unread: 0 },
-  { id: 'dm-5', name: 'Mirza Redžić', initials: 'MR', lastMessage: "I'll send you the details tomorrow", time: '5h ago', unread: 0 },
-  { id: 'dm-6', name: 'Sara Bašić', initials: 'SB', lastMessage: 'Great meeting you at the event! 🎉', time: '1d ago', unread: 0 },
-];
+import { useChatRooms, useDmRooms } from '../hooks/useChatRooms';
+import { chatService, getDmPeerName } from '../services/chatService';
+import { usersService } from '../services/usersService';
+import type { User } from '../types/user.types';
 
 const ChatsScreen = () => {
   const navigation = useNavigation();
   const { colors } = useTheme();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<'groups' | 'dms'>('groups');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [startingDm, setStartingDm] = useState<string | null>(null);
+
   const { data: rawEvents = [], isLoading: isEventsLoading } = useEvents();
+  const { data: rooms = [] } = useChatRooms();
+  const { data: dmRooms = [], isLoading: isDmLoading } = useDmRooms(currentUser?._id ?? null);
+
   const eventList = useMemo(() => (rawEvents as any[]).slice(0, 5), [rawEvents]);
+  const eventRoomMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    rooms.forEach((r) => {
+      if (r.type === 'event' && r.eventId) map[r.eventId] = r._id;
+    });
+    return map;
+  }, [rooms]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('auth_user').then((raw) => {
+      if (raw) setCurrentUser(JSON.parse(raw));
+    });
+  }, []);
+
+  const openPicker = useCallback(async () => {
+    setShowPicker(true);
+    setSearch('');
+    if (users.length === 0) {
+      setUsersLoading(true);
+      try {
+        const all = await usersService.getAll();
+        setUsers(all.filter((u) => u._id !== currentUser?._id));
+      } catch {
+        setUsers([]);
+      } finally {
+        setUsersLoading(false);
+      }
+    }
+  }, [users.length, currentUser]);
+
+  const startDm = useCallback(
+    async (target: User) => {
+      if (!currentUser?._id || !target._id) return;
+      setStartingDm(target._id);
+      try {
+        const room = await chatService.getOrCreateDmRoom(
+          target._id,
+          target.username ?? target.name ?? 'User',
+        );
+        queryClient.invalidateQueries({ queryKey: ['dmRooms'] });
+        setShowPicker(false);
+        navigation.navigate('ChatDetail', {
+          chatId: room._id,
+          roomId: room._id,
+          dmPeerName: target.username ?? target.name ?? 'User',
+        });
+      } catch {
+        // silently fail — user sees no change
+      } finally {
+        setStartingDm(null);
+      }
+    },
+    [currentUser, navigation, queryClient],
+  );
+
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((u) =>
+        (u.username ?? u.name ?? '').toLowerCase().includes(search.toLowerCase()),
+      ),
+    [users, search],
+  );
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Segmented Control */}
       <View style={styles.segmentWrap}>
         <View style={[styles.segment, { backgroundColor: colors.muted }]}>
@@ -40,7 +116,12 @@ const ChatsScreen = () => {
               style={[styles.segBtn, tab === t && { backgroundColor: colors.primary }]}
               onPress={() => setTab(t)}
             >
-              <Text style={[styles.segText, { color: tab === t ? '#fff' : colors.mutedForeground }]}>
+              <Text
+                style={[
+                  styles.segText,
+                  { color: tab === t ? '#fff' : colors.mutedForeground },
+                ]}
+              >
                 {t === 'groups' ? 'Groups' : 'Direct Messages'}
               </Text>
             </TouchableOpacity>
@@ -53,13 +134,20 @@ const ChatsScreen = () => {
           {/* Global Community Chat */}
           <TouchableOpacity
             onPress={() => navigation.navigate('GlobalChat')}
-            style={[styles.globalRoom, { backgroundColor: colors.card, borderColor: colors.primary }]}
+            style={[
+              styles.globalRoom,
+              { backgroundColor: colors.card, borderColor: colors.primary },
+            ]}
           >
             <View style={styles.globalTitle}>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={[styles.globalRoomName, { color: colors.foreground }]}>Global Community Chat</Text>
+                <Text style={[styles.globalRoomName, { color: colors.foreground }]}>
+                  Global Community Chat
+                </Text>
                 <View style={[styles.memberBadge, { backgroundColor: colors.primary + '1A' }]}>
-                  <Text style={[styles.memberBadgeText, { color: colors.primary }]}>👥 1,250</Text>
+                  <Text style={[styles.memberBadgeText, { color: colors.primary }]}>
+                    👥 1,250
+                  </Text>
                 </View>
               </View>
               <View style={styles.pinnedRow}>
@@ -69,7 +157,9 @@ const ChatsScreen = () => {
             </View>
             <View style={[styles.pollChip, { backgroundColor: colors.primary + '1A' }]}>
               <Ionicons name="bar-chart-outline" size={16} color={colors.primary} />
-              <Text style={[styles.pollChipText, { color: colors.primary }]}>Poll: Next Pizza Tour Location?</Text>
+              <Text style={[styles.pollChipText, { color: colors.primary }]}>
+                Poll: Next Pizza Tour Location?
+              </Text>
             </View>
             <Text style={[styles.globalDesc, { color: colors.mutedForeground }]}>
               Welcome all expats! Community updates & fun polls.
@@ -77,14 +167,18 @@ const ChatsScreen = () => {
           </TouchableOpacity>
 
           {/* Event Chats */}
-          <Text style={[styles.groupLabel, { color: colors.mutedForeground }]}>Your Event Chats</Text>
+          <Text style={[styles.groupLabel, { color: colors.mutedForeground }]}>
+            Your Event Chats
+          </Text>
           {isEventsLoading ? (
             <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
           ) : (
             <View style={[styles.chatList, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {eventList.length === 0 ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No event chats yet.</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+                    No event chats yet.
+                  </Text>
                 </View>
               ) : (
                 eventList.map((event, idx) => {
@@ -92,11 +186,19 @@ const ChatsScreen = () => {
                     (typeof event.content === 'string'
                       ? event.content
                       : (event.content ?? [])[0] ?? ''
-                    ).split('\n')[0].trim() || 'Event';
+                    )
+                      .split('\n')[0]
+                      .trim() || 'Event';
+                  const roomId = eventRoomMap[event._id];
                   return (
                     <TouchableOpacity
                       key={event._id}
-                      onPress={() => navigation.navigate('ChatDetail', { chatId: `event-${event._id}` })}
+                      onPress={() =>
+                        navigation.navigate('ChatDetail', {
+                          chatId: `event-${event._id}`,
+                          ...(roomId ? { roomId } : {}),
+                        })
+                      }
                       style={[
                         styles.chatRow,
                         { borderBottomColor: colors.border },
@@ -110,20 +212,41 @@ const ChatsScreen = () => {
                           fadeDuration={200}
                         />
                       ) : (
-                        <View style={[styles.avatar, { backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }]}>
-                          <Ionicons name="calendar-outline" size={20} color={colors.mutedForeground} />
+                        <View
+                          style={[
+                            styles.avatar,
+                            {
+                              backgroundColor: colors.muted,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            },
+                          ]}
+                        >
+                          <Ionicons
+                            name="calendar-outline"
+                            size={20}
+                            color={colors.mutedForeground}
+                          />
                         </View>
                       )}
                       <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={[styles.chatName, { color: colors.foreground }]} numberOfLines={1}>
+                        <Text
+                          style={[styles.chatName, { color: colors.foreground }]}
+                          numberOfLines={1}
+                        >
                           {title}
                         </Text>
-                        <Text style={[styles.chatLast, { color: colors.mutedForeground }]} numberOfLines={1}>
-                          Chat coming soon...
+                        <Text
+                          style={[styles.chatLast, { color: colors.mutedForeground }]}
+                          numberOfLines={1}
+                        >
+                          {roomId ? 'Tap to join chat' : 'Chat coming soon...'}
                         </Text>
                       </View>
                       <View style={styles.chatMeta}>
-                        <Text style={[styles.chatTime, { color: colors.mutedForeground }]}>{event.date ?? ''}</Text>
+                        <Text style={[styles.chatTime, { color: colors.mutedForeground }]}>
+                          {event.date ?? ''}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -134,41 +257,168 @@ const ChatsScreen = () => {
         </View>
       ) : (
         <View style={styles.content}>
-          <View style={[styles.chatList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {directMessages.map((dm, idx) => (
-              <TouchableOpacity
-                key={dm.id}
-                onPress={() => navigation.navigate('ChatDetail', { chatId: dm.id })}
-                style={[
-                  styles.chatRow,
-                  { borderBottomColor: colors.border },
-                  idx === directMessages.length - 1 && { borderBottomWidth: 0 },
-                ]}
-              >
-                <View style={[styles.initialsAvatar, { backgroundColor: colors.primary + '1A' }]}>
-                  <Text style={[styles.initialsText, { color: colors.primary }]}>{dm.initials}</Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.chatName, { color: colors.foreground }]} numberOfLines={1}>
-                    {dm.name}
-                  </Text>
-                  <Text style={[styles.chatLast, { color: colors.mutedForeground }]} numberOfLines={1}>
-                    {dm.lastMessage}
-                  </Text>
-                </View>
-                <View style={styles.chatMeta}>
-                  <Text style={[styles.chatTime, { color: colors.mutedForeground }]}>{dm.time}</Text>
-                  {dm.unread > 0 && (
-                    <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
-                      <Text style={styles.unreadText}>{dm.unread}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+          {/* Header row with New DM button */}
+          <View style={styles.dmHeader}>
+            <Text style={[styles.groupLabel, { color: colors.mutedForeground }]}>
+              Your Conversations
+            </Text>
+            <TouchableOpacity
+              onPress={openPicker}
+              style={[styles.newDmBtn, { backgroundColor: colors.primary }]}
+            >
+              <Ionicons name="create-outline" size={16} color="#fff" />
+              <Text style={styles.newDmBtnText}>New</Text>
+            </TouchableOpacity>
           </View>
+
+          {isDmLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 16 }} />
+          ) : dmRooms.length === 0 ? (
+            <View style={[styles.emptyDm, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="chatbubble-ellipses-outline" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyDmText, { color: colors.mutedForeground }]}>
+                No conversations yet
+              </Text>
+              <Text style={[styles.emptyDmSub, { color: colors.mutedForeground }]}>
+                Tap "New" to message someone
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.chatList,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              {dmRooms.map((room, idx) => {
+                const peerName = currentUser?._id
+                  ? getDmPeerName(room, currentUser._id)
+                  : room.name;
+                const initials = peerName.substring(0, 2).toUpperCase();
+                return (
+                  <TouchableOpacity
+                    key={room._id}
+                    onPress={() =>
+                      navigation.navigate('ChatDetail', {
+                        chatId: room._id,
+                        roomId: room._id,
+                        dmPeerName: peerName,
+                      })
+                    }
+                    style={[
+                      styles.chatRow,
+                      { borderBottomColor: colors.border },
+                      idx === dmRooms.length - 1 && { borderBottomWidth: 0 },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.initialsAvatar,
+                        { backgroundColor: colors.primary + '1A' },
+                      ]}
+                    >
+                      <Text style={[styles.initialsText, { color: colors.primary }]}>
+                        {initials}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={[styles.chatName, { color: colors.foreground }]}
+                        numberOfLines={1}
+                      >
+                        {peerName}
+                      </Text>
+                      <Text
+                        style={[styles.chatLast, { color: colors.mutedForeground }]}
+                        numberOfLines={1}
+                      >
+                        Tap to open conversation
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
+
+      {/* User Picker Modal */}
+      <Modal visible={showPicker} animationType="slide" presentationStyle="pageSheet">
+        <View style={[styles.pickerContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.pickerHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.pickerTitle, { color: colors.foreground }]}>
+              New Message
+            </Text>
+            <TouchableOpacity onPress={() => setShowPicker(false)}>
+              <Ionicons name="close" size={24} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.searchWrap, { backgroundColor: colors.muted }]}>
+            <Ionicons name="search-outline" size={16} color={colors.mutedForeground} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search people..."
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.searchInput, { color: colors.foreground }]}
+              autoFocus
+            />
+          </View>
+
+          {usersLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              data={filteredUsers}
+              keyExtractor={(u) => u._id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item: user }) => {
+                const name = user.username ?? user.name ?? user.email ?? 'User';
+                const initials = name.substring(0, 2).toUpperCase();
+                const isLoading = startingDm === user._id;
+                return (
+                  <TouchableOpacity
+                    onPress={() => startDm(user)}
+                    disabled={!!startingDm}
+                    style={[styles.userRow, { borderBottomColor: colors.border }]}
+                  >
+                    <View
+                      style={[
+                        styles.initialsAvatar,
+                        { backgroundColor: colors.primary + '1A' },
+                      ]}
+                    >
+                      <Text style={[styles.initialsText, { color: colors.primary }]}>
+                        {initials}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.chatName, { color: colors.foreground }]}>
+                        {name}
+                      </Text>
+                      {user.email ? (
+                        <Text style={[styles.chatLast, { color: colors.mutedForeground }]}>
+                          {user.email}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {isLoading && (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <Text style={{ color: colors.mutedForeground }}>No users found</Text>
+                </View>
+              }
+            />
+          )}
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -190,7 +440,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  globalTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  globalTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   globalRoomName: { fontSize: 15, fontWeight: '700' },
   memberBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 },
   memberBadgeText: { fontSize: 11, fontWeight: '700' },
@@ -229,15 +483,57 @@ const styles = StyleSheet.create({
   chatLast: { fontSize: 12, marginTop: 2 },
   chatMeta: { alignItems: 'flex-end', gap: 4 },
   chatTime: { fontSize: 10 },
-  unreadBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+  dmHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
+    justifyContent: 'space-between',
   },
-  unreadText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  newDmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 99,
+  },
+  newDmBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  emptyDm: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 40,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyDmText: { fontSize: 15, fontWeight: '600' },
+  emptyDmSub: { fontSize: 13 },
+  pickerContainer: { flex: 1 },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  pickerTitle: { fontSize: 17, fontWeight: '700' },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 15 },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+  },
 });
 
 export default ChatsScreen;

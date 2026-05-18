@@ -66,40 +66,6 @@ const dmMessages: Record<string, ChatMessage[]> = {
   ],
 };
 
-const chatMessages: Record<string, ChatMessage[]> = {
-  '1': [
-    { id: '1', sender: 'Amar K.', initials: 'AK', text: "Who's bringing the ball today? 🏀", time: '3:15 PM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: "I've got one! See you at the court.", time: '3:17 PM', isMe: true },
-    { id: '3', sender: 'Hana B.', initials: 'HB', text: "Great, I'll be there at 6. Don't start without me 😄", time: '3:20 PM', isMe: false },
-    { id: '4', sender: 'Mirza R.', initials: 'MR', text: 'Same here, running a bit late though', time: '3:22 PM', isMe: false },
-    { id: '5', sender: 'You', initials: 'TT', text: "No worries, we'll warm up first!", time: '3:24 PM', isMe: true },
-  ],
-  '3': [
-    { id: '1', sender: 'Kayra T.', initials: 'KT', text: "I'm bringing Catan tonight! 🎲", time: '5:00 PM', isMe: false },
-    { id: '2', sender: 'Sara B.', initials: 'SB', text: 'Yes! I call dibs on the longest road strategy', time: '5:02 PM', isMe: false },
-    { id: '3', sender: 'You', initials: 'TT', text: "I'll bring snacks. Any requests?", time: '5:05 PM', isMe: true },
-    { id: '4', sender: 'Jasmin D.', initials: 'JD', text: 'Chips and dip would be perfect 🙌', time: '5:08 PM', isMe: false },
-  ],
-  '2': [
-    { id: '1', sender: 'Lejla P.', initials: 'LP', text: "Weather looks perfect for Saturday's hike!", time: '9:00 AM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: "Can't wait! Which trail are we doing?", time: '9:05 AM', isMe: true },
-    { id: '3', sender: 'Nihad V.', initials: 'NV', text: 'I vote for Trebević, amazing views up there 🏔️', time: '9:10 AM', isMe: false },
-    { id: '4', sender: 'You', initials: 'TT', text: 'Trebević it is! Meet at 8 AM at the cable car?', time: '9:15 AM', isMe: true },
-    { id: '5', sender: 'Lejla P.', initials: 'LP', text: 'Perfect, see you all there! ☀️', time: '9:18 AM', isMe: false },
-  ],
-  '5': [
-    { id: '1', sender: 'Faruk K.', initials: 'FK', text: 'Anyone need a ride to the event?', time: '2:00 PM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: "That would be great! I'm coming from Baščaršija", time: '2:05 PM', isMe: true },
-    { id: '3', sender: 'Faruk K.', initials: 'FK', text: 'I can pick you up at 5:30, DM me the exact spot 🚗', time: '2:08 PM', isMe: false },
-  ],
-  '7': [
-    { id: '1', sender: 'Dina M.', initials: 'DM', text: "Can't wait for the tasting menu tonight 🍽️", time: '11:00 AM', isMe: false },
-    { id: '2', sender: 'Tarik I.', initials: 'TI', text: 'I heard the chef prepared something special!', time: '11:05 AM', isMe: false },
-    { id: '3', sender: 'You', initials: 'TT', text: 'So excited! Do we need to pre-order anything?', time: '11:10 AM', isMe: true },
-    { id: '4', sender: 'Dina M.', initials: 'DM', text: "Nope, it's a surprise tasting. Just come hungry! 😋", time: '11:12 AM', isMe: false },
-  ],
-};
-
 const pollOptions = [
   { label: 'Saturday Evening', votes: 18 },
   { label: 'Sunday Afternoon', votes: 12 },
@@ -110,23 +76,29 @@ const totalVotes = pollOptions.reduce((s, o) => s + o.votes, 0);
 const ChatDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RootStackScreenProps<'ChatDetail'>['route']>();
-  const { chatId } = route.params;
+  const { chatId, roomId: roomIdParam, dmPeerName } = route.params;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const isDm = chatId.startsWith('dm-');
-  const dmProfile = isDm ? dmProfiles[chatId] : null;
+  // Legacy mock DMs use chatId like 'dm-1'; real DMs have a roomId param
+  const isMockDm = chatId.startsWith('dm-') && !roomIdParam;
+  const isDm = isMockDm || !!dmPeerName;
+  const dmProfile = isMockDm ? dmProfiles[chatId] : null;
   const event = !isDm ? events.find((e) => e.id === chatId) : null;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Use socket for all real rooms (event chats + real DMs)
+  const socketRoomId = roomIdParam ?? (!isMockDm && !isDm ? chatId : null);
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    isMockDm ? (dmMessages[chatId] ?? []) : [],
+  );
   const [input, setInput] = useState('');
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
   const [showPoll, setShowPoll] = useState(true);
   const [currentUser, setCurrentUser] = useState<{ _id: string; username: string } | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  const chatTitle = isDm ? dmProfile?.name ?? 'Chat' : event?.title ?? 'Chat';
+  const chatTitle = dmPeerName ?? dmProfile?.name ?? event?.title ?? 'Chat';
 
-  // Giriş yapan kullanıcıyı AsyncStorage'dan oku
   useEffect(() => {
     AsyncStorage.getItem('auth_user').then((raw) => {
       if (raw) setCurrentUser(JSON.parse(raw));
@@ -134,19 +106,20 @@ const ChatDetailScreen = () => {
   }, []);
 
   useEffect(() => {
+    if (isMockDm || !socketRoomId) return;
     let isMounted = true;
 
     const setup = async () => {
-      const socket = await socketService.connect();
-      socket.emit('join_room', chatId);
+      await socketService.connect();
 
-      const handlePrevious = (msgs: any[]) => {
+      const handlePrevious = (data: { roomId: string; messages: any[] }) => {
         if (!isMounted) return;
+        const msgs = Array.isArray(data) ? data : data.messages ?? [];
         const formatted = msgs.map((m) => ({
           id: m._id ?? m.id,
           sender: m.senderName,
-          initials: m.senderName.substring(0, 2).toUpperCase(),
-          text: m.content,
+          initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
+          text: m.message ?? m.content ?? '',
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isMe: m.senderId === currentUser?._id,
         }));
@@ -155,43 +128,62 @@ const ChatDetailScreen = () => {
 
       const handleReceive = (m: any) => {
         if (!isMounted) return;
-        const formatted = {
-          id: m._id ?? m.id,
-          sender: m.senderName,
-          initials: m.senderName.substring(0, 2).toUpperCase(),
-          text: m.content,
-          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isMe: m.senderId === currentUser?._id,
-        };
-        setMessages((prev) => [...prev, formatted]);
-        // Yeni mesajda en aşağı kay
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: m._id ?? m.id,
+            sender: m.senderName,
+            initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
+            text: m.message ?? m.content ?? '',
+            time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isMe: m.senderId === currentUser?._id,
+          },
+        ]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       };
 
-      socket.on('previous_messages', handlePrevious);
-      socket.on('receive_message', handleReceive);
+      socketService.on('previous_messages', handlePrevious);
+      socketService.on('receive_message', handleReceive);
+      socketService.joinRoom(socketRoomId);
 
       return () => {
-        socket.off('previous_messages', handlePrevious);
-        socket.off('receive_message', handleReceive);
+        socketService.off('previous_messages', handlePrevious);
+        socketService.off('receive_message', handleReceive);
+        socketService.leaveRoom(socketRoomId);
       };
     };
 
-    setup();
-    return () => { isMounted = false; };
-  }, [chatId, currentUser]);
+    let cleanup: (() => void) | undefined;
+    setup().then((fn) => { cleanup = fn; });
+
+    return () => {
+      isMounted = false;
+      cleanup?.();
+    };
+  }, [chatId, socketRoomId, currentUser, isDm]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !currentUser) return;
+    if (!input.trim()) return;
 
-    const socket = await socketService.connect();
-    socket.emit('send_message', {
-      roomId: chatId,
-      senderId: currentUser._id,
-      senderName: currentUser.username,
-      content: input.trim(),
-    });
+    if (isMockDm || !socketRoomId) {
+      // Legacy mock DMs are local-only
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: String(Date.now()),
+          sender: 'You',
+          initials: 'YO',
+          text: input.trim(),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: true,
+        },
+      ]);
+      setInput('');
+      return;
+    }
 
+    await socketService.connect();
+    socketService.sendMessage(socketRoomId, input.trim());
     setInput('');
   };
 
@@ -210,8 +202,10 @@ const ChatDetailScreen = () => {
           <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
             {chatTitle}
           </Text>
-          {isDm && dmProfile && (
-            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>{dmProfile.status}</Text>
+          {isDm && (
+            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
+              {dmProfile?.status ?? 'Direct Message'}
+            </Text>
           )}
         </View>
         {!isDm && event && (
