@@ -10,6 +10,22 @@ import { useTheme } from '../contexts/ThemeContext';
 import { servicesService, Service } from '../services/servicesService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 const ServiceDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RootStackScreenProps<'ServiceDetail'>['route']>();
@@ -102,7 +118,7 @@ const ServiceDetailScreen = () => {
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About</Text>
               <Text style={[styles.description, { color: colors.mutedForeground }]}>
-                {service.description}
+                {stripHtml(service.description)}
               </Text>
             </View>
           ) : null}

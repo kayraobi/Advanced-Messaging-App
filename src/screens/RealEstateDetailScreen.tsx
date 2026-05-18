@@ -21,6 +21,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 const RealEstateDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RootStackScreenProps<'RealEstateDetail'>['route']>();
@@ -57,7 +73,7 @@ const RealEstateDetailScreen = () => {
   }
 
   const title = listing.title ?? listing.name ?? (listing.content ?? '').split('\n')[0].trim() ?? 'Listing';
-  const description = listing.description ?? listing.content ?? '';
+  const description = stripHtml(listing.description ?? listing.content ?? '');
   const coverImage = listing.displayUrl ?? listing.pictures?.[0] ?? null;
   const gallery: string[] = listing.pictures ?? (coverImage ? [coverImage] : []);
   const typeLabel = typeof listing.realEstateType === 'object'

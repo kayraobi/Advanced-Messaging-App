@@ -15,6 +15,18 @@ import { serviceTypesService, ServiceType } from '../services/serviceTypesServic
 
 type ExploreTab = 'places' | 'realEstate' | 'services' | 'trips';
 
+// Fallback places — API boş dönünce bunlar gösterilir
+const MOCK_PLACES: Place[] = [
+  { _id: 'mock-1', name: 'Baščaršija', address: 'Baščaršija, Sarajevo', location: 'Old Town', placeType: { _id: 'mock-type-1', name: 'Landmark' }, displayUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Bascarsija_Sarajevo.jpg/1280px-Bascarsija_Sarajevo.jpg', description: 'The historic bazaar and the old town of Sarajevo.' },
+  { _id: 'mock-2', name: 'Vijećnica', address: 'Obala Kulina bana 1, Sarajevo', location: 'Old Town', placeType: { _id: 'mock-type-2', name: 'Museum' }, displayUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Vijecnica.jpg/1280px-Vijecnica.jpg', description: 'The National and University Library of Bosnia and Herzegovina.' },
+  { _id: 'mock-3', name: 'Yellow Fortress', address: 'Žuta tabija, Sarajevo', location: 'Vratnik', placeType: { _id: 'mock-type-3', name: 'Landmark' }, displayUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Zuta_tabija_Sarajevo.jpg/1280px-Zuta_tabija_Sarajevo.jpg', description: 'An Ottoman fortress with panoramic views of Sarajevo.' },
+  { _id: 'mock-4', name: 'Gazi Husrev-beg Mosque', address: 'Sarači 8, Sarajevo', location: 'Old Town', placeType: { _id: 'mock-type-4', name: 'Religious Site' }, displayUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Gazi_Husrev-begova_d%C5%BEamija.jpg/1280px-Gazi_Husrev-begova_d%C5%BEamija.jpg', description: 'The largest Ottoman mosque in Bosnia and Herzegovina.' },
+  { _id: 'mock-5', name: 'Tunnel of Hope Museum', address: 'Tuneli bb, Butmir, Sarajevo', location: 'Butmir', placeType: { _id: 'mock-type-2', name: 'Museum' }, displayUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Tunnel_of_hope_museum.jpg/1280px-Tunnel_of_hope_museum.jpg', description: 'A tunnel used during the 1992–1995 Siege of Sarajevo.' },
+  { _id: 'mock-6', name: 'Sarajevo Cable Car', address: 'Bistrik, Sarajevo', location: 'Trebević', placeType: { _id: 'mock-type-3', name: 'Landmark' }, displayUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Trebevic_gondola.jpg/1280px-Trebevic_gondola.jpg', description: 'Gondola ride up to Mount Trebević with stunning city views.' },
+  { _id: 'mock-7', name: 'Inat Kuća', address: 'Velika Avlija 1, Sarajevo', location: 'Old Town', placeType: { _id: 'mock-type-5', name: 'Restaurant' }, displayUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Inat_kuca.jpg/1280px-Inat_kuca.jpg', description: 'Historic house turned restaurant with traditional Bosnian food.' },
+  { _id: 'mock-8', name: 'Bosnian Cultural Centre', address: 'Branilaca Sarajeva 24', location: 'City Center', placeType: { _id: 'mock-type-6', name: 'Co-Working Space' }, displayUrl: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800', description: 'A creative hub and co-working space in the heart of Sarajevo.' },
+];
+
 const getTitle = (item: any): string =>
   (item.name ?? item.title ?? (item.content ?? '').split('\n')[0].trim()) || 'Item';
 
@@ -114,10 +126,22 @@ const ExploreScreen = () => {
               chips = await placeTypesService.getAll().catch(() => []);
             }
             if (flat.length === 0) {
-              flat = await placesService.getAll();
-              if (chips.length === 0) {
-                chips = await placeTypesService.getAll().catch(() => []);
-              }
+              try {
+                flat = await placesService.getAll();
+                if (chips.length === 0) {
+                  chips = await placeTypesService.getAll().catch(() => []);
+                }
+              } catch { /* 403 veya başka hata — mock'a düş */ }
+            }
+            // API boş veya 403 dönünce mock Saraybosna mekanlarını göster
+            if (flat.length === 0) {
+              flat = MOCK_PLACES;
+              // Mock places kullanılıyorsa chip'leri de mock'tan üret
+              // (API chip ID'leri mock place ID'leriyle eşleşmez)
+              const seen = new Set<string>();
+              chips = flat
+                .map((p) => (typeof p.placeType === 'object' ? p.placeType as PlaceType : null))
+                .filter((t): t is PlaceType => t !== null && !seen.has(t._id) && !!seen.add(t._id));
             }
             setPlaceTypes(chips);
             placesBaselineRef.current = flat;
@@ -426,22 +450,40 @@ const ExploreScreen = () => {
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16, paddingBottom: 8 }}>
         {tab === 'places' ? (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('SubmitPlace')}
-            style={[styles.quickLink, { borderColor: TAB_COLORS.places, backgroundColor: TAB_COLORS.places + '12' }]}
-          >
-            <Ionicons name="add-circle-outline" size={18} color={TAB_COLORS.places} />
-            <Text style={[styles.quickLinkText, { color: TAB_COLORS.places }]}>Suggest a place</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SubmitPlace')}
+              style={[styles.quickLink, { borderColor: TAB_COLORS.places, backgroundColor: TAB_COLORS.places + '12' }]}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={TAB_COLORS.places} />
+              <Text style={[styles.quickLinkText, { color: TAB_COLORS.places }]}>Suggest a place</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('MapView', { type: 'places' })}
+              style={[styles.quickLink, { borderColor: TAB_COLORS.places, backgroundColor: TAB_COLORS.places + '12' }]}
+            >
+              <Ionicons name="map-outline" size={18} color={TAB_COLORS.places} />
+              <Text style={[styles.quickLinkText, { color: TAB_COLORS.places }]}>View on Map</Text>
+            </TouchableOpacity>
+          </>
         ) : null}
         {tab === 'realEstate' ? (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('SubmitRealEstate')}
-            style={[styles.quickLink, { borderColor: TAB_COLORS.realEstate, backgroundColor: TAB_COLORS.realEstate + '12' }]}
-          >
-            <Ionicons name="home-outline" size={18} color={TAB_COLORS.realEstate} />
-            <Text style={[styles.quickLinkText, { color: TAB_COLORS.realEstate }]}>Post a listing</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SubmitRealEstate')}
+              style={[styles.quickLink, { borderColor: TAB_COLORS.realEstate, backgroundColor: TAB_COLORS.realEstate + '12' }]}
+            >
+              <Ionicons name="home-outline" size={18} color={TAB_COLORS.realEstate} />
+              <Text style={[styles.quickLinkText, { color: TAB_COLORS.realEstate }]}>Post a listing</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('MapView', { type: 'realEstate' })}
+              style={[styles.quickLink, { borderColor: TAB_COLORS.realEstate, backgroundColor: TAB_COLORS.realEstate + '12' }]}
+            >
+              <Ionicons name="map-outline" size={18} color={TAB_COLORS.realEstate} />
+              <Text style={[styles.quickLinkText, { color: TAB_COLORS.realEstate }]}>View on Map</Text>
+            </TouchableOpacity>
+          </>
         ) : null}
       </View>
 
@@ -569,64 +611,38 @@ const ExploreScreen = () => {
                     : { backgroundColor: colors.card, borderColor: colors.border },
                 ]}
                 onPress={() => {
-                  if (tab === 'services') {
-                    const nextId = active ? null : type._id;
-                    setActiveTypeFilter(nextId);
-                    if (!nextId) {
-                      setServices(servicesBaselineRef.current);
-                      return;
-                    }
-                    setLoading((prev) => ({ ...prev, services: true }));
-                    void (async () => {
-                      try {
-                        const st = await serviceTypesService.getById(nextId);
-                        const flat = (Array.isArray(st.services) ? st.services : []).map((s) => ({
-                          ...s,
-                          serviceType: { _id: st._id, name: st.name ?? '' },
-                        }));
-                        setServices(flat);
-                      } catch {
-                        setServices(servicesBaselineRef.current);
-                        setActiveTypeFilter(nextId);
-                      } finally {
-                        setLoading((prev) => ({ ...prev, services: false }));
-                      }
-                    })();
-                    return;
-                  }
-                  if (tab !== 'places') return;
+                  // Tamamen client-side filtreleme — API çağrısı yok
                   const nextId = active ? null : type._id;
                   setActiveTypeFilter(nextId);
-                  if (!nextId) {
-                    setPlaces(placesBaselineRef.current);
+
+                  if (tab === 'services') {
+                    if (!nextId) {
+                      setServices(servicesBaselineRef.current);
+                    } else {
+                      const filtered = servicesBaselineRef.current.filter((s) => {
+                        const typeId = typeof (s as any).serviceType === 'object'
+                          ? (s as any).serviceType?._id
+                          : (s as any).serviceType;
+                        return typeId === nextId;
+                      });
+                      setServices(filtered.length > 0 ? filtered : servicesBaselineRef.current);
+                    }
                     return;
                   }
-                  setLoading((prev) => ({ ...prev, places: true }));
-                  void (async () => {
-                    try {
-                      const pt = await placeTypesService.getById(nextId);
-                      let flat = (Array.isArray(pt.places) ? pt.places : []).map((p) => ({
-                        ...p,
-                        placeType: { _id: pt._id, name: pt.name ?? '' },
-                      }));
-                      // Sunucu embed etmediyse client-side filtrele
-                      if (flat.length === 0) {
-                        const clientFiltered = placesBaselineRef.current.filter((p) => {
-                          const typeId = typeof p.placeType === 'object'
-                            ? (p.placeType as any)?._id
-                            : p.placeType;
-                          return typeId === nextId;
-                        });
-                        setPlaces(clientFiltered.length > 0 ? clientFiltered : placesBaselineRef.current);
-                        return;
-                      }
-                      setPlaces(flat);
-                    } catch {
+
+                  if (tab === 'places') {
+                    if (!nextId) {
                       setPlaces(placesBaselineRef.current);
-                    } finally {
-                      setLoading((prev) => ({ ...prev, places: false }));
+                    } else {
+                      const filtered = placesBaselineRef.current.filter((p) => {
+                        const typeId = typeof p.placeType === 'object'
+                          ? (p.placeType as any)?._id
+                          : p.placeType;
+                        return typeId === nextId;
+                      });
+                      setPlaces(filtered.length > 0 ? filtered : placesBaselineRef.current);
                     }
-                  })();
+                  }
                 }}
               >
                 <Text style={[styles.filterChipText, { color: active ? '#fff' : colors.mutedForeground }]} numberOfLines={1}>

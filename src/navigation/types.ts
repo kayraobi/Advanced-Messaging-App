@@ -19,6 +19,7 @@ export type RootStackParamList = {
   SponsorDetail: { sponsorId: string };
   UserProfile: { userId: string };
   GlobalChat: undefined;
+  MapView: { type: 'places' | 'realEstate' };
   SubmitPlace: undefined;
   SubmitRealEstate: undefined;
   BusinessPartnership: undefined;
