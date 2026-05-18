@@ -153,12 +153,13 @@ const ChatDetailScreen = () => {
       };
     };
 
-    let cleanup: (() => void) | undefined;
-    setup().then((fn) => { cleanup = fn; });
+    let cleanupFn: (() => void) | undefined;
+    const promise = setup().then((fn) => { cleanupFn = fn; });
 
     return () => {
       isMounted = false;
-      cleanup?.();
+      // Wait for setup to finish then run cleanup, handles fast-unmount race
+      promise.then(() => cleanupFn?.());
     };
   }, [chatId, socketRoomId, currentUser, isDm]);
 

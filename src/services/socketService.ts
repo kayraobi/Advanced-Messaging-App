@@ -9,6 +9,13 @@ export const socketService = {
   async connect(): Promise<Socket> {
     if (socket && socket.connected) return socket;
 
+    // Clean up stale socket before creating a new one
+    if (socket) {
+      socket.removeAllListeners();
+      socket.disconnect();
+      socket = null;
+    }
+
     const token = await AsyncStorage.getItem('auth_token');
 
     socket = io(BASE_URL, {

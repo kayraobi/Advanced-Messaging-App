@@ -1,12 +1,13 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { chatRepository } from '../repositories/chatRepository';
+import { config } from '../config';
 
-function getUserFromSocket(socket: Socket): { id: string; username: string } {
+function getUserFromSocket(socket: Socket): { id: string; username: string } | null {
   const token = socket.handshake.auth?.token as string | undefined;
   if (token) {
     try {
-      const decoded = jwt.decode(token) as any;
+      const decoded = jwt.verify(token, config.jwt.secret) as any;
       const u = decoded?.user ?? decoded;
       if (u) {
         return {
@@ -15,21 +16,36 @@ function getUserFromSocket(socket: Socket): { id: string; username: string } {
         };
       }
     } catch {
-      // fall through
+      // invalid token
     }
   }
-  return { id: socket.id, username: 'Anonymous' };
+  return null;
 }
 
 export const initializeChatSocket = (io: Server) => {
   io.on('connection', (socket: Socket) => {
-    console.log(`[Socket] User connected: ${socket.id}`);
+    const user = getUserFromSocket(socket);
+    if (!user) {
+      socket.disconnect(true);
+      return;
+    }
+    console.log(`[Socket] User connected: ${socket.id} (${user.username})`);
 
     socket.on(
       'join_room',
       async (data: { roomId: string } | string, callback?: Function) => {
         const roomId = typeof data === 'string' ? data : data?.roomId;
         if (!roomId) return;
+
+        // For DM rooms, verify the user is a participant
+        const dmRooms = await chatRepository.getDmRooms(user.id);
+        const publicRooms = await chatRepository.getRooms();
+        const isGlobalOrEvent = publicRooms.some((r) => r._id === roomId);
+        const isDmAllowed = dmRooms.some((r) => r._id === roomId);
+        if (!isGlobalOrEvent && !isDmAllowed) {
+          if (typeof callback === 'function') callback({ success: false, error: 'Unauthorized' });
+          return;
+        }
 
         socket.join(roomId);
         console.log(`[Socket] ${socket.id} joined room ${roomId}`);
@@ -50,7 +66,6 @@ export const initializeChatSocket = (io: Server) => {
         callback?: Function,
       ) => {
         try {
-          const user = getUserFromSocket(socket);
           const savedMessage = await chatRepository.saveMessage({
             roomId: data.roomId,
             senderId: user.id,
