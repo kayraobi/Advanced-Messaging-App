@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 
 import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
+import chatRoutes from './routes/chatRoutes';
 
 const app: Express = express();
 
@@ -32,6 +33,7 @@ app.get('/health', (req: Request, res: Response) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

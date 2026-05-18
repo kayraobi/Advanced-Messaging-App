@@ -11,7 +11,7 @@ export type RootStackParamList = {
   // Detail screens pushable from any tab
   EventDetail: { eventId: string };
   NewsDetail: { newsId: string };
-  ChatDetail: { chatId: string };
+  ChatDetail: { chatId: string; roomId?: string; dmPeerName?: string };
   PlaceDetail: { placeId: string };
   RealEstateDetail: { realEstateId: string };
   ServiceDetail: { serviceId: string };
