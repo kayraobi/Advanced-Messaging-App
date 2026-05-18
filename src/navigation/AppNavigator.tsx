@@ -26,6 +26,7 @@ import MyEventsScreen from '../screens/MyEventsScreen';
 import GmAdminScreen from '../screens/GmAdminScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import QaasScreen from '../screens/QaasScreen';
+import MapScreen from '../screens/MapScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -71,6 +72,7 @@ export default function AppNavigator() {
             <Stack.Screen name="GmAdmin" component={GmAdminScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="Qaas" component={QaasScreen} />
+            <Stack.Screen name="MapView" component={MapScreen} />
           </>
         ) : (
           <Stack.Screen name="Auth">

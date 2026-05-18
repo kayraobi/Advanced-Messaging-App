@@ -22,6 +22,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+/** HTML tag ve entity'leri temizler — API'den gelen raw HTML description'lar için */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')          // <br> → newline
+    .replace(/<\/p>/gi, '\n\n')             // </p> → double newline
+    .replace(/<\/li>/gi, '\n')              // </li> → newline
+    .replace(/<[^>]+>/g, '')               // tüm diğer HTML taglerini kaldır
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')            // 3+ boş satırı 2'ye indir
+    .trim();
+}
+
 const PlaceDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RootStackScreenProps<'PlaceDetail'>['route']>();
@@ -58,7 +75,7 @@ const PlaceDetailScreen = () => {
   }
 
   const title = place.name ?? place.title ?? (place.content ?? '').split('\n')[0].trim() ?? 'Place';
-  const description = place.description ?? place.content ?? '';
+  const description = stripHtml(place.description ?? place.content ?? '');
   const coverImage = place.displayUrl ?? place.pictures?.[0] ?? null;
   const gallery: string[] = place.pictures ?? (coverImage ? [coverImage] : []);
   const typeLabel = typeof place.placeType === 'object' ? place.placeType?.name : place.placeType;
