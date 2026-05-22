@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#f97316"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.sarajevoexpats.app"

@@ -10,6 +10,12 @@ function normalizeUserRaw(raw: Record<string, unknown>, fallbackId?: string): Us
   const username =
     usernameRaw || (email.includes('@') ? email.split('@')[0] : email) || 'member';
   const interestsRaw = raw.interests;
+  const photoRaw =
+    raw.displayUrl ?? raw.profilePicture ?? raw.avatar ?? raw.avatarUrl ?? raw.picture;
+  const displayUrl =
+    typeof photoRaw === 'string' && photoRaw.trim().length > 0
+      ? photoRaw.trim()
+      : undefined;
   return {
     _id: uid,
     username,
@@ -18,6 +24,7 @@ function normalizeUserRaw(raw: Record<string, unknown>, fallbackId?: string): Us
     name: raw.name != null ? String(raw.name) : undefined,
     phone: raw.phone != null ? String(raw.phone) : undefined,
     interests: Array.isArray(interestsRaw) ? interestsRaw.map((x) => String(x)) : undefined,
+    displayUrl,
   };
 }
 

@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -67,9 +68,13 @@ const UserProfileScreen = () => {
       ) : user ? (
         <ScrollView contentContainerStyle={styles.body}>
           <View style={[styles.avatar, { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '40' }]}>
-            <Text style={[styles.avatarText, { color: colors.primary }]}>
-              {(user.username ?? user.name ?? '?').slice(0, 2).toUpperCase()}
-            </Text>
+            {user.displayUrl ? (
+              <Image source={{ uri: user.displayUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={[styles.avatarText, { color: colors.primary }]}>
+                {(user.username ?? user.name ?? '?').slice(0, 2).toUpperCase()}
+              </Text>
+            )}
           </View>
           <Text style={[styles.name, { color: colors.foreground }]}>
             {user.name ?? user.username}
@@ -114,7 +119,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     marginBottom: 8,
+    overflow: 'hidden',
   },
+  avatarImage: { width: 96, height: 96 },
   avatarText: { fontSize: 28, fontWeight: '800' },
   name: { fontSize: 22, fontWeight: '800', marginTop: 4 },
   meta: { fontSize: 14 },

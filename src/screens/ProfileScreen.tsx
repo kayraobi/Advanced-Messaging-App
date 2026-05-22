@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -14,10 +14,11 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
-import { socketService } from '../services/socketService';
+import { uploadService } from '../services/uploadService';
 import { useQueryClient } from '@tanstack/react-query';
 import { realEstateService } from '../services/realEstateService';
 import type { RealEstate } from '../services/realEstateService';
@@ -36,6 +37,7 @@ const ProfileScreen = () => {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [interestsSaving, setInterestsSaving] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -50,13 +52,16 @@ const ProfileScreen = () => {
 
   useEffect(() => {
     const loadUser = async () => {
-      // Show stored user first for fast loading
-      const stored = await authService.getStoredUser();
-      if (stored) setUser(stored);
-      // Then fetch the latest data from the API
-      const fresh = await authService.getMe();
-      if (fresh) setUser(fresh);
-      setUserLoading(false);
+      try {
+        const stored = await authService.getStoredUser();
+        if (stored) setUser(stored);
+        const fresh = await authService.getMe();
+        if (fresh) setUser(fresh);
+      } catch (e) {
+        console.warn('[ProfileScreen] loadUser failed', e);
+      } finally {
+        setUserLoading(false);
+      }
     };
     loadUser();
   }, []);
@@ -73,6 +78,105 @@ const ProfileScreen = () => {
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) =>
       prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest]
+    );
+  };
+
+  const refreshUser = useCallback(async () => {
+    const fresh = await authService.getMe();
+    if (fresh) setUser(fresh);
+    return fresh;
+  }, []);
+
+  const applyProfilePhotoFromServerUrl = useCallback(async (imageUrl: string) => {
+    const saved = await authService.saveProfilePhoto(imageUrl);
+    const fresh = await authService.getMe();
+    const nextUser = fresh
+      ? { ...fresh, displayUrl: fresh.displayUrl ?? saved?.displayUrl ?? imageUrl }
+      : saved;
+    if (nextUser) setUser(nextUser);
+    Alert.alert('Photo updated', 'Your profile photo is set.');
+  }, []);
+
+  const changeProfilePhoto = useCallback(async () => {
+    if (!user?._id) {
+      Alert.alert('Sign in required', 'Log in to change your profile photo.');
+      return;
+    }
+
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo library access to choose a profile photo.');
+      return;
+    }
+
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+    });
+    if (res.canceled || !res.assets[0]) return;
+
+    const asset = res.assets[0];
+    setPhotoUploading(true);
+    try {
+      let imageUrl: string;
+      try {
+        imageUrl = await uploadService.uploadImage({
+          uri: asset.uri,
+          name: asset.fileName ?? 'profile.jpg',
+          mimeType: asset.mimeType ?? 'image/jpeg',
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Upload failed.';
+        Alert.alert(
+          'Upload failed',
+          msg.includes('authorized') || msg.includes('403')
+            ? `${msg}\n\nYour account may need upload permission on the server (upload.single).`
+            : msg,
+        );
+        return;
+      }
+
+      await applyProfilePhotoFromServerUrl(imageUrl);
+    } catch (e) {
+      Alert.alert(
+        'Could not update photo',
+        e instanceof Error ? e.message : 'Something went wrong.',
+      );
+    } finally {
+      setPhotoUploading(false);
+    }
+  }, [user?._id, applyProfilePhotoFromServerUrl]);
+
+  const avatarInitials = (user?.username ?? user?.name ?? '?').slice(0, 2).toUpperCase();
+
+  const renderAvatar = (size: 'header' | 'edit') => {
+    const isHeader = size === 'header';
+    const boxStyle = isHeader ? styles.avatar : styles.editAvatar;
+    const textStyle = isHeader ? styles.avatarText : styles.editAvatarText;
+    const uri = user?.displayUrl;
+
+    return (
+      <View style={styles.avatarWrap}>
+        <View style={[boxStyle, { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '30' }]}>
+          {userLoading && !user ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : uri ? (
+            <Image source={{ uri }} style={isHeader ? styles.avatarImage : styles.editAvatarImage} />
+          ) : (
+            <Text style={[textStyle, { color: colors.primary }]}>{avatarInitials}</Text>
+          )}
+          {photoUploading ? (
+            <View style={styles.avatarOverlay}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          ) : null}
+        </View>
+        {!photoUploading ? (
+          <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
+            <Ionicons name="camera" size={isHeader ? 16 : 14} color="#fff" />
+          </View>
+        ) : null}
+      </View>
     );
   };
 
@@ -152,15 +256,17 @@ const ProfileScreen = () => {
     >
       {/* Profile Header */}
       <View style={styles.profileHeader}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '30' }]}>
-          {userLoading && !user ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Text style={[styles.avatarText, { color: colors.primary }]}>
-              {(user?.username ?? user?.name ?? '?').slice(0, 2).toUpperCase()}
-            </Text>
-          )}
-        </View>
+        <TouchableOpacity
+          onPress={changeProfilePhoto}
+          disabled={photoUploading || userLoading}
+          activeOpacity={0.8}
+          accessibilityLabel="Change profile photo"
+        >
+          {renderAvatar('header')}
+        </TouchableOpacity>
+        <Text style={[styles.avatarHint, { color: colors.mutedForeground }]}>
+          Tap photo to change
+        </Text>
         <Text style={[styles.name, { color: colors.foreground }]}>
           {user?.name ?? user?.username ?? '—'}
         </Text>
@@ -244,6 +350,36 @@ const ProfileScreen = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.interestsContent}>
+            <View style={styles.editPhotoRow}>
+              <TouchableOpacity
+                onPress={changeProfilePhoto}
+                disabled={photoUploading}
+                activeOpacity={0.8}
+              >
+                {renderAvatar('edit')}
+              </TouchableOpacity>
+              <View style={{ flex: 1, gap: 8 }}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>
+                  Profile photo
+                </Text>
+                <TouchableOpacity
+                  style={[styles.changePhotoBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+                  onPress={changeProfilePhoto}
+                  disabled={photoUploading}
+                >
+                  {photoUploading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <Ionicons name="image-outline" size={18} color={colors.primary} />
+                      <Text style={{ color: colors.foreground, fontWeight: '600', fontSize: 14 }}>
+                        Choose from gallery
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Display name</Text>
             <TextInput
               value={editName}
@@ -271,8 +407,7 @@ const ProfileScreen = () => {
                     name: editName.trim(),
                     phone: editPhone.trim(),
                   });
-                  const fresh = await authService.getMe();
-                  if (fresh) setUser(fresh);
+                  await refreshUser();
                   Alert.alert('Profile updated');
                   setShowEditProfile(false);
                 } catch (e) {
@@ -341,8 +476,7 @@ const ProfileScreen = () => {
                 setInterestsSaving(true);
                 try {
                   await authService.updateMyInterests(selectedInterests);
-                  const fresh = await authService.getMe();
-                  if (fresh) setUser(fresh);
+                  await refreshUser();
                   Alert.alert('Saved', `${selectedInterests.length} interests synced to your account.`);
                   setShowInterests(false);
                 } catch (e) {
@@ -473,6 +607,7 @@ const ProfileScreen = () => {
 
 const styles = StyleSheet.create({
   profileHeader: { alignItems: 'center', paddingTop: 40, paddingBottom: 24, paddingHorizontal: 16 },
+  avatarWrap: { position: 'relative' },
   avatar: {
     width: 96,
     height: 96,
@@ -480,9 +615,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
+    overflow: 'hidden',
+  },
+  avatarImage: { width: 96, height: 96 },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   avatarText: { fontSize: 28, fontWeight: '800' },
-  name: { marginTop: 14, fontSize: 22, fontWeight: '800' },
+  avatarHint: { marginTop: 8, fontSize: 12 },
+  editPhotoRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 4 },
+  editAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+  editAvatarImage: { width: 72, height: 72 },
+  editAvatarText: { fontSize: 22, fontWeight: '800' },
+  changePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  name: { marginTop: 10, fontSize: 22, fontWeight: '800' },
   role: { marginTop: 4, fontSize: 14 },
   email: { marginTop: 2, fontSize: 12 },
   menu: { paddingHorizontal: 16, gap: 10 },

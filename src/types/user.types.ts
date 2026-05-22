@@ -6,6 +6,8 @@ export interface User {
   name?: string;
   phone?: string;
   interests?: string[];
+  /** Profile photo URL from API (same field as listings/places). */
+  displayUrl?: string;
 }
 
 export interface LoginRequest {

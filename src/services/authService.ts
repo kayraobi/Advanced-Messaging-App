@@ -10,6 +10,10 @@ import {
   JwtPayload,
 } from '../types/user.types';
 import { unwrapApiEntity } from '../utils/apiUnwrap';
+import {
+  enrichUserWithProfilePhoto,
+  setCachedProfilePhoto,
+} from './profilePhotoCache';
 
 /** Maps GET /api/users/me payload to app User (Swagger Users schema). */
 function normalizeUserFromMe(raw: unknown): User | null {
@@ -22,6 +26,12 @@ function normalizeUserFromMe(raw: unknown): User | null {
   const username =
     usernameRaw || (email.includes('@') ? email.split('@')[0] : email) || 'user';
   const interestsRaw = r.interests;
+  const photoRaw =
+    r.displayUrl ?? r.profilePicture ?? r.avatar ?? r.avatarUrl ?? r.picture;
+  const displayUrl =
+    typeof photoRaw === 'string' && photoRaw.trim().length > 0
+      ? photoRaw.trim()
+      : undefined;
   return {
     _id: id,
     username,
@@ -32,6 +42,7 @@ function normalizeUserFromMe(raw: unknown): User | null {
     interests: Array.isArray(interestsRaw)
       ? interestsRaw.map((x) => String(x))
       : undefined,
+    displayUrl,
   };
 }
 
@@ -101,8 +112,9 @@ export const authService = {
       try {
         const me = await authService.getMe();
         if (me) {
-          await AsyncStorage.setItem('auth_user', JSON.stringify(me));
-          return me;
+          const enriched = await enrichUserWithProfilePhoto(me);
+          await AsyncStorage.setItem('auth_user', JSON.stringify(enriched));
+          return enriched;
         }
       } catch {
         /* fall through */
@@ -113,8 +125,9 @@ export const authService = {
         const decoded = jwtDecode<JwtPayload>(token);
         const normalized = normalizeUserFromMe(decoded.user);
         const finalUser = normalized ?? (decoded.user as User);
-        await AsyncStorage.setItem('auth_user', JSON.stringify(finalUser));
-        return finalUser;
+        const enriched = await enrichUserWithProfilePhoto(finalUser);
+        await AsyncStorage.setItem('auth_user', JSON.stringify(enriched));
+        return enriched;
       } catch {
         const bodyUser = user as Record<string, unknown> | undefined;
         const fallbackUser: User =
@@ -125,8 +138,9 @@ export const authService = {
             email: normalizedIdentifier,
             type: user?.type ?? 'GM',
           } as User);
-        await AsyncStorage.setItem('auth_user', JSON.stringify(fallbackUser));
-        return fallbackUser;
+        const enriched = await enrichUserWithProfilePhoto(fallbackUser);
+        await AsyncStorage.setItem('auth_user', JSON.stringify(enriched));
+        return enriched;
       }
     } catch (e) {
       throw handleError(e);
@@ -160,7 +174,8 @@ export const authService = {
 
       // Skip token verification in mock mode
       if (USE_MOCK || token === 'mock_token') {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw) as User;
+        return enrichUserWithProfilePhoto(parsed);
       }
 
       // Check if token is expired
@@ -172,7 +187,8 @@ export const authService = {
         return null;
       }
 
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw) as User;
+      return enrichUserWithProfilePhoto(parsed);
     } catch {
       return null;
     }
@@ -188,31 +204,98 @@ export const authService = {
     try {
       const res = await api.get<unknown>('/api/users/me');
       const raw = unwrapApiEntity<unknown>(res.data);
-      return normalizeUserFromMe(raw);
+      const user = normalizeUserFromMe(raw);
+      if (!user) return null;
+      return enrichUserWithProfilePhoto(user);
     } catch {
       return null;
     }
   },
 
+  /** Payload variants so backend can persist photo under different field names. */
+  buildProfilePhotoPayload: (displayUrl: string): Record<string, string> => ({
+    displayUrl,
+    profilePicture: displayUrl,
+    avatar: displayUrl,
+    picture: displayUrl,
+    display_url: displayUrl,
+    profile_picture: displayUrl,
+  }),
+
+  /** Merge fields into stored user (when API profile update is unavailable). */
+  mergeStoredUser: async (partial: Partial<User>): Promise<User | null> => {
+    const stored = await authService.getStoredUser();
+    if (!stored) return null;
+    const merged = { ...stored, ...partial };
+    await AsyncStorage.setItem('auth_user', JSON.stringify(merged));
+    return merged;
+  },
+
   /**
-   * PATCH /api/users/me — update profile fields (name, phone, username, …).
-   * Backend expects snake_case or camelCase depending on deployment; send camelCase first.
+   * Update profile: PATCH /api/users/me, then PUT /api/users/{id}, then local cache.
    */
   updateMe: async (
-    payload: Partial<Pick<User, 'username' | 'name' | 'phone'>> & Record<string, unknown>,
+    payload: Partial<Pick<User, 'username' | 'name' | 'phone' | 'displayUrl'>> &
+      Record<string, unknown>,
   ): Promise<User | null> => {
-    if (USE_MOCK) return null;
+    if (USE_MOCK) return authService.mergeStoredUser(payload);
+
+    const stored = await authService.getStoredUser();
+    let savedOnApi = false;
+    const photoUrl = typeof payload.displayUrl === 'string' ? payload.displayUrl : undefined;
+    const apiBody =
+      photoUrl != null
+        ? { ...payload, ...authService.buildProfilePhotoPayload(photoUrl) }
+        : payload;
 
     try {
-      await api.patch('/api/users/me', payload);
-      const merged = await authService.getMe();
-      if (merged) {
-        await AsyncStorage.setItem('auth_user', JSON.stringify(merged));
+      await api.patch('/api/users/me', apiBody);
+      savedOnApi = true;
+    } catch (patchErr) {
+      const status = patchErr instanceof AxiosError ? patchErr.response?.status : undefined;
+      if (stored?._id && (status === 404 || status === 405 || status === 501 || status === 400)) {
+        try {
+          await api.put(`/api/users/${encodeURIComponent(stored._id)}`, apiBody);
+          savedOnApi = true;
+        } catch {
+          /* try cache fallback below */
+        }
       }
-      return merged;
-    } catch (e) {
-      throw handleError(e);
+      if (!savedOnApi && photoUrl && stored) {
+        await setCachedProfilePhoto(stored._id, photoUrl);
+        return authService.mergeStoredUser({ displayUrl: photoUrl });
+      }
+      if (!savedOnApi) throw handleError(patchErr);
     }
+
+    const merged = await authService.getMe();
+    if (merged) {
+      const withPhoto = photoUrl
+        ? await enrichUserWithProfilePhoto({
+            ...merged,
+            displayUrl: merged.displayUrl ?? photoUrl,
+          })
+        : merged;
+      await AsyncStorage.setItem('auth_user', JSON.stringify(withPhoto));
+      if (photoUrl) await setCachedProfilePhoto(withPhoto._id, photoUrl);
+      return withPhoto;
+    }
+    if (stored) {
+      if (photoUrl) await setCachedProfilePhoto(stored._id, photoUrl);
+      return authService.mergeStoredUser(
+        photoUrl ? { displayUrl: photoUrl } : payload,
+      );
+    }
+    return null;
+  },
+
+  /** Upload URL → API (when supported) + per-user cache (survives logout). */
+  saveProfilePhoto: async (displayUrl: string): Promise<User | null> => {
+    const stored = await authService.getStoredUser();
+    if (stored?._id) await setCachedProfilePhoto(stored._id, displayUrl);
+    const updated = await authService.updateMe({ displayUrl });
+    if (updated) return updated;
+    return authService.mergeStoredUser({ displayUrl });
   },
 
   /** POST /api/users/me/interests — persist interest labels. */
