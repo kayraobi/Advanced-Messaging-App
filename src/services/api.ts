@@ -24,6 +24,10 @@ api.interceptors.request.use(
 		if (token && config.headers) {
 			config.headers.Authorization = `Bearer ${token}`;
 		}
+		// Let the runtime set multipart boundary (default application/json breaks uploads)
+		if (config.data instanceof FormData && config.headers) {
+			delete config.headers["Content-Type"];
+		}
 		return config;
 	},
 	(error: AxiosError) => Promise.reject(error),
@@ -44,7 +48,10 @@ api.interceptors.response.use(
 export const handleError = (error: unknown): never => {
 	if (error instanceof AxiosError) {
 		const status = error.response?.status;
-		const msg = error.response?.data?.message;
+		const data = error.response?.data as
+			| { message?: string; error?: string; msg?: string }
+			| undefined;
+		const msg = data?.message ?? data?.error ?? data?.msg;
 
 		// Geçici debug — gerçek hatayı görmek için
 		console.log('[API ERROR]', {
