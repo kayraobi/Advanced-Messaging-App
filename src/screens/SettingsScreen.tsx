@@ -122,6 +122,13 @@ const SettingsScreen = () => {
             </View>
           </View>
         ))}
+        
+        {/* App Version Info */}
+        <View style={{ alignItems: 'center', marginTop: 10, paddingBottom: 20 }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13, fontWeight: '500' }}>
+            Sarajevo Expats v1.0.0
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
