@@ -17,10 +17,13 @@ import { useTheme } from '../contexts/ThemeContext';
 import { events } from '../data/events';
 import { socketService } from '../services/socketService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUserProfile } from '../hooks/useUserProfile';
+import UserProfileModal from '../components/UserProfileModal';
 
 interface ChatMessage {
   id: string;
   sender: string;
+  senderId: string;
   initials: string;
   text: string;
   time: string;
@@ -38,31 +41,31 @@ const dmProfiles: Record<string, { name: string; initials: string; status: strin
 
 const dmMessages: Record<string, ChatMessage[]> = {
   'dm-1': [
-    { id: '1', sender: 'Yahia', initials: 'YA', text: 'Welcome to the community! Let me know if you need anything 🙌', time: '9:00 AM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: 'Thanks Yahia! Excited to be here.', time: '9:05 AM', isMe: true },
-    { id: '3', sender: 'Yahia', initials: 'YA', text: 'Check out the events page, lots happening this week!', time: '9:06 AM', isMe: false },
+    { id: '1', sender: 'Yahia', senderId: '', initials: 'YA', text: 'Welcome to the community! Let me know if you need anything 🙌', time: '9:00 AM', isMe: false },
+    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Thanks Yahia! Excited to be here.', time: '9:05 AM', isMe: true },
+    { id: '3', sender: 'Yahia', senderId: '', initials: 'YA', text: 'Check out the events page, lots happening this week!', time: '9:06 AM', isMe: false },
   ],
   'dm-2': [
-    { id: '1', sender: 'Amar', initials: 'AK', text: 'Hey! Are you coming to the basketball game?', time: '2:30 PM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: 'Definitely! What time does it start?', time: '2:35 PM', isMe: true },
-    { id: '3', sender: 'Amar', initials: 'AK', text: '6 PM at the outdoor court. Bring water!', time: '2:37 PM', isMe: false },
+    { id: '1', sender: 'Amar', senderId: '', initials: 'AK', text: 'Hey! Are you coming to the basketball game?', time: '2:30 PM', isMe: false },
+    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Definitely! What time does it start?', time: '2:35 PM', isMe: true },
+    { id: '3', sender: 'Amar', senderId: '', initials: 'AK', text: '6 PM at the outdoor court. Bring water!', time: '2:37 PM', isMe: false },
   ],
   'dm-3': [
-    { id: '1', sender: 'You', initials: 'TT', text: 'Hey Hana! Do you know any good restaurants near Baščaršija?', time: '11:00 AM', isMe: true },
-    { id: '2', sender: 'Hana', initials: 'HB', text: 'Try Dveri! Amazing Bosnian food 😊', time: '11:10 AM', isMe: false },
-    { id: '3', sender: 'You', initials: 'TT', text: 'Thanks for the recommendation!', time: '11:12 AM', isMe: true },
+    { id: '1', sender: 'You', senderId: '', initials: 'TT', text: 'Hey Hana! Do you know any good restaurants near Baščaršija?', time: '11:00 AM', isMe: true },
+    { id: '2', sender: 'Hana', senderId: '', initials: 'HB', text: 'Try Dveri! Amazing Bosnian food 😊', time: '11:10 AM', isMe: false },
+    { id: '3', sender: 'You', senderId: '', initials: 'TT', text: 'Thanks for the recommendation!', time: '11:12 AM', isMe: true },
   ],
   'dm-4': [
-    { id: '1', sender: 'Kayra', initials: 'KT', text: "Let's grab coffee sometime this week ☕", time: '4:00 PM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: 'Sure! Wednesday afternoon works for me', time: '4:15 PM', isMe: true },
+    { id: '1', sender: 'Kayra', senderId: '', initials: 'KT', text: "Let's grab coffee sometime this week ☕", time: '4:00 PM', isMe: false },
+    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Sure! Wednesday afternoon works for me', time: '4:15 PM', isMe: true },
   ],
   'dm-5': [
-    { id: '1', sender: 'Mirza', initials: 'MR', text: "I'll send you the details tomorrow", time: '6:00 PM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: 'Sounds good, thanks!', time: '6:05 PM', isMe: true },
+    { id: '1', sender: 'Mirza', senderId: '', initials: 'MR', text: "I'll send you the details tomorrow", time: '6:00 PM', isMe: false },
+    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Sounds good, thanks!', time: '6:05 PM', isMe: true },
   ],
   'dm-6': [
-    { id: '1', sender: 'Sara', initials: 'SB', text: 'Great meeting you at the event! 🎉', time: '10:00 PM', isMe: false },
-    { id: '2', sender: 'You', initials: 'TT', text: 'Likewise! Hope to see you at the next one', time: '10:05 PM', isMe: true },
+    { id: '1', sender: 'Sara', senderId: '', initials: 'SB', text: 'Great meeting you at the event! 🎉', time: '10:00 PM', isMe: false },
+    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Likewise! Hope to see you at the next one', time: '10:05 PM', isMe: true },
   ],
 };
 
@@ -79,13 +82,11 @@ const ChatDetailScreen = () => {
   const { chatId, roomId: roomIdParam, dmPeerName } = route.params;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  // Legacy mock DMs use chatId like 'dm-1'; real DMs have a roomId param
   const isMockDm = chatId.startsWith('dm-') && !roomIdParam;
   const isDm = isMockDm || !!dmPeerName;
   const dmProfile = isMockDm ? dmProfiles[chatId] : null;
   const event = !isDm ? events.find((e) => e.id === chatId) : null;
 
-  // Use socket for all real rooms (event chats + real DMs)
   const socketRoomId = roomIdParam ?? (!isMockDm && !isDm ? chatId : null);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
@@ -96,6 +97,8 @@ const ChatDetailScreen = () => {
   const [showPoll, setShowPoll] = useState(true);
   const [currentUser, setCurrentUser] = useState<{ _id: string; username: string } | null>(null);
   const flatListRef = useRef<FlatList>(null);
+
+  const { profilePreview, profileLoading, showProfile, openProfile, closeProfile } = useUserProfile();
 
   const chatTitle = dmPeerName ?? dmProfile?.name ?? event?.title ?? 'Chat';
 
@@ -118,6 +121,7 @@ const ChatDetailScreen = () => {
         const formatted = msgs.map((m) => ({
           id: m._id ?? m.id,
           sender: m.senderName,
+          senderId: m.senderId ?? '',
           initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
           text: m.message ?? m.content ?? '',
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -133,6 +137,7 @@ const ChatDetailScreen = () => {
           {
             id: m._id ?? m.id,
             sender: m.senderName,
+            senderId: m.senderId ?? '',
             initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
             text: m.message ?? m.content ?? '',
             time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -158,7 +163,6 @@ const ChatDetailScreen = () => {
 
     return () => {
       isMounted = false;
-      // Wait for setup to finish then run cleanup, handles fast-unmount race
       promise.then(() => cleanupFn?.());
     };
   }, [chatId, socketRoomId, currentUser, isDm]);
@@ -167,12 +171,12 @@ const ChatDetailScreen = () => {
     if (!input.trim()) return;
 
     if (isMockDm || !socketRoomId) {
-      // Legacy mock DMs are local-only
       setMessages((prev) => [
         ...prev,
         {
           id: String(Date.now()),
           sender: 'You',
+          senderId: '',
           initials: 'YO',
           text: input.trim(),
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -263,9 +267,13 @@ const ChatDetailScreen = () => {
         renderItem={({ item: msg }) => (
           <View style={[styles.msgRow, msg.isMe && styles.msgRowMe]}>
             {!msg.isMe && (
-              <View style={[styles.msgAvatar, { backgroundColor: colors.primary + '1A' }]}>
+              <TouchableOpacity
+                style={[styles.msgAvatar, { backgroundColor: colors.primary + '1A' }]}
+                onPress={() => openProfile(msg.senderId, msg.sender, msg.initials)}
+                activeOpacity={0.7}
+              >
                 <Text style={[styles.msgAvatarText, { color: colors.primary }]}>{msg.initials}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             <View style={[styles.msgBubbleWrap, msg.isMe && { alignItems: 'flex-end' }]}>
               {!msg.isMe && (
@@ -312,6 +320,15 @@ const ChatDetailScreen = () => {
           <Ionicons name="send" size={16} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        visible={showProfile}
+        onClose={closeProfile}
+        profilePreview={profilePreview}
+        profileLoading={profileLoading}
+        colors={colors}
+      />
     </KeyboardAvoidingView>
   );
 };

@@ -18,10 +18,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { socketService } from '../services/socketService';
 import { useGlobalRoom } from '../hooks/useChatRooms';
+import { useUserProfile } from '../hooks/useUserProfile';
+import UserProfileModal from '../components/UserProfileModal';
 
 interface ChatMessage {
   id: string;
   sender: string;
+  senderId: string;
   initials: string;
   text: string;
   time: string;
@@ -48,6 +51,7 @@ const GlobalChatScreen = () => {
 
   const { globalRoom } = useGlobalRoom();
   const roomId = globalRoom?._id;
+  const { profilePreview, profileLoading, showProfile, openProfile, closeProfile } = useUserProfile();
 
   useEffect(() => {
     AsyncStorage.getItem('auth_user').then((raw) => {
@@ -68,6 +72,7 @@ const GlobalChatScreen = () => {
         const formatted = msgs.map((m) => ({
           id: m._id ?? m.id,
           sender: m.senderName,
+          senderId: m.senderId ?? '',
           initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
           text: m.message ?? m.content ?? '',
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -84,6 +89,7 @@ const GlobalChatScreen = () => {
           {
             id: m._id ?? m.id,
             sender: m.senderName,
+            senderId: m.senderId ?? '',
             initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
             text: m.message ?? m.content ?? '',
             time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -187,9 +193,13 @@ const GlobalChatScreen = () => {
         renderItem={({ item: msg }) => (
           <View style={[styles.msgRow, msg.isMe && styles.msgRowMe]}>
             {!msg.isMe && (
-              <View style={[styles.msgAvatar, { backgroundColor: colors.primary + '1A' }]}>
+              <TouchableOpacity
+                style={[styles.msgAvatar, { backgroundColor: colors.primary + '1A' }]}
+                onPress={() => openProfile(msg.senderId, msg.sender, msg.initials)}
+                activeOpacity={0.7}
+              >
                 <Text style={[styles.msgAvatarText, { color: colors.primary }]}>{msg.initials}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             <View style={[styles.msgBubbleWrap, msg.isMe && { alignItems: 'flex-end' }]}>
               {!msg.isMe && (
@@ -241,6 +251,15 @@ const GlobalChatScreen = () => {
           <Ionicons name="send" size={16} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        visible={showProfile}
+        onClose={closeProfile}
+        profilePreview={profilePreview}
+        profileLoading={profileLoading}
+        colors={colors}
+      />
     </KeyboardAvoidingView>
   );
 };
