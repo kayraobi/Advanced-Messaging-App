@@ -23,7 +23,7 @@ import { useEvents } from '../hooks/useEvents';
 import { useChatRooms, useDmRooms } from '../hooks/useChatRooms';
 import { chatService, getDmPeerName } from '../services/chatService';
 import { usersService } from '../services/usersService';
-import { sendGeminiMessage, type GeminiMessage } from '../services/geminiService';
+import { sendGeminiMessage, type GeminiMessage } from '../services/groqService';
 import type { User } from '../types/user.types';
 
 const ChatsScreen = () => {
