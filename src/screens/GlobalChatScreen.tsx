@@ -11,10 +11,6 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Modal,
-  Image,
-  ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,8 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { socketService } from '../services/socketService';
 import { useGlobalRoom } from '../hooks/useChatRooms';
-import { usersService } from '../services/usersService';
-import type { User } from '../types/user.types';
+import { useUserProfile } from '../hooks/useUserProfile';
+import UserProfileModal from '../components/UserProfileModal';
 
 interface ChatMessage {
   id: string;
@@ -55,24 +51,7 @@ const GlobalChatScreen = () => {
 
   const { globalRoom } = useGlobalRoom();
   const roomId = globalRoom?._id;
-  const [profileUser, setProfileUser] = useState<User | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
-
-  const openProfile = async (senderId: string) => {
-    if (!senderId) return;
-    setProfileUser(null);
-    setShowProfile(true);
-    setProfileLoading(true);
-    try {
-      const user = await usersService.getById(senderId);
-      setProfileUser(user);
-    } catch {
-      setProfileUser(null);
-    } finally {
-      setProfileLoading(false);
-    }
-  };
+  const { profilePreview, profileLoading, showProfile, openProfile, closeProfile } = useUserProfile();
 
   useEffect(() => {
     AsyncStorage.getItem('auth_user').then((raw) => {
@@ -216,7 +195,7 @@ const GlobalChatScreen = () => {
             {!msg.isMe && (
               <TouchableOpacity
                 style={[styles.msgAvatar, { backgroundColor: colors.primary + '1A' }]}
-                onPress={() => openProfile(msg.senderId)}
+                onPress={() => openProfile(msg.senderId, msg.sender, msg.initials)}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.msgAvatarText, { color: colors.primary }]}>{msg.initials}</Text>
@@ -274,78 +253,13 @@ const GlobalChatScreen = () => {
       </View>
 
       {/* User Profile Modal */}
-      <Modal
+      <UserProfileModal
         visible={showProfile}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowProfile(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowProfile(false)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            style={[styles.profileSheet, { backgroundColor: colors.card }]}
-            onPress={() => {}}
-          >
-            {/* Handle bar */}
-            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
-
-            {profileLoading ? (
-              <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 40 }} />
-            ) : profileUser ? (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-                {/* Avatar */}
-                <View style={styles.profileAvatarWrap}>
-                  {profileUser.displayUrl ? (
-                    <Image source={{ uri: profileUser.displayUrl }} style={styles.profileAvatar} />
-                  ) : (
-                    <View style={[styles.profileAvatarPlaceholder, { backgroundColor: colors.primary + '22' }]}>
-                      <Text style={[styles.profileAvatarInitials, { color: colors.primary }]}>
-                        {profileUser.username.substring(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Name & type */}
-                <Text style={[styles.profileName, { color: colors.foreground }]}>
-                  {profileUser.name ?? profileUser.username}
-                </Text>
-                <Text style={[styles.profileUsername, { color: colors.mutedForeground }]}>
-                  @{profileUser.username}
-                </Text>
-                {profileUser.type && profileUser.type !== 'user' && (
-                  <View style={[styles.profileBadge, { backgroundColor: colors.primary + '18' }]}>
-                    <Text style={[styles.profileBadgeText, { color: colors.primary }]}>{profileUser.type}</Text>
-                  </View>
-                )}
-
-                {/* Interests */}
-                {profileUser.interests && profileUser.interests.length > 0 && (
-                  <View style={styles.interestsSection}>
-                    <Text style={[styles.interestsLabel, { color: colors.mutedForeground }]}>Interests</Text>
-                    <View style={styles.interestsTags}>
-                      {profileUser.interests.map((tag, i) => (
-                        <View key={i} style={[styles.interestTag, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
-                          <Text style={[styles.interestTagText, { color: colors.primary }]}>{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </ScrollView>
-            ) : (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <Ionicons name="person-circle-outline" size={48} color={colors.mutedForeground} />
-                <Text style={[{ color: colors.mutedForeground, marginTop: 12, fontSize: 14 }]}>Profile not available</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        onClose={closeProfile}
+        profilePreview={profilePreview}
+        profileLoading={profileLoading}
+        colors={colors}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -410,45 +324,6 @@ const styles = StyleSheet.create({
   },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   textInput: { flex: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  profileSheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    maxHeight: '75%',
-  },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  profileAvatarWrap: { alignItems: 'center', marginBottom: 12 },
-  profileAvatar: { width: 88, height: 88, borderRadius: 44 },
-  profileAvatarPlaceholder: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileAvatarInitials: { fontSize: 28, fontWeight: '700' },
-  profileName: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
-  profileUsername: { fontSize: 14, textAlign: 'center', marginTop: 2, marginBottom: 8 },
-  profileBadge: {
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 16,
-  },
-  profileBadgeText: { fontSize: 12, fontWeight: '600' },
-  interestsSection: { marginTop: 16 },
-  interestsLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  interestsTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  interestTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  interestTagText: { fontSize: 13, fontWeight: '500' },
 });
 
 export default GlobalChatScreen;

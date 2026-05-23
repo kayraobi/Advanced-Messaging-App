@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -11,8 +11,6 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +21,8 @@ import { useEvents } from '../hooks/useEvents';
 import { useChatRooms, useDmRooms } from '../hooks/useChatRooms';
 import { chatService, getDmPeerName } from '../services/chatService';
 import { usersService } from '../services/usersService';
-import { sendGeminiMessage, type GeminiMessage } from '../services/groqService';
+import { useAiAssistant } from '../hooks/useAiAssistant';
+import AiAssistantModal from '../components/AiAssistantModal';
 import type { User } from '../types/user.types';
 
 const ChatsScreen = () => {
@@ -39,29 +38,8 @@ const ChatsScreen = () => {
   const [search, setSearch] = useState('');
   const [startingDm, setStartingDm] = useState<string | null>(null);
 
-  // AI Assistant state
-  const [showAI, setShowAI] = useState(false);
-  const [aiMessages, setAiMessages] = useState<GeminiMessage[]>([]);
-  const [aiInput, setAiInput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const aiListRef = useRef<FlatList>(null);
-
-  const sendAiMessage = useCallback(async () => {
-    const text = aiInput.trim();
-    if (!text || aiLoading) return;
-    setAiInput('');
-    const userMsg: GeminiMessage = { role: 'user', text };
-    setAiMessages((prev) => [...prev, userMsg]);
-    setAiLoading(true);
-    try {
-      const reply = await sendGeminiMessage(aiMessages, text);
-      setAiMessages((prev) => [...prev, { role: 'model', text: reply }]);
-    } catch {
-      setAiMessages((prev) => [...prev, { role: 'model', text: 'Sorry, something went wrong. Please try again.' }]);
-    } finally {
-      setAiLoading(false);
-    }
-  }, [aiInput, aiLoading, aiMessages]);
+  // AI Assistant
+  const { showAI, setShowAI, aiMessages, aiInput, setAiInput, aiLoading, aiListRef, sendAiMessage } = useAiAssistant();
 
   const { data: rawEvents = [], isLoading: isEventsLoading } = useEvents();
   const { data: rooms = [] } = useChatRooms();
@@ -457,116 +435,23 @@ const ChatsScreen = () => {
       onPress={() => setShowAI(true)}
       activeOpacity={0.85}
     >
-      <Image source={{ uri: 'https://groq.com/favicon.ico' }} style={styles.aiFloatLogo} resizeMode="contain" />
+      <View style={styles.aiFloatLogo}><Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>G</Text></View>
       <Text style={styles.aiFloatText}>Ask AI</Text>
     </TouchableOpacity>
 
     {/* AI Chat Modal */}
-    <Modal visible={showAI} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAI(false)}>
-      <KeyboardAvoidingView
-        style={[styles.aiModal, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* Header */}
-        <View style={[styles.aiHeader, { borderBottomColor: colors.border }]}>
-          <View style={styles.aiHeaderLeft}>
-            <Image
-              source={{ uri: 'https://groq.com/favicon.ico' }}
-              style={styles.aiAvatar}
-              resizeMode="contain"
-            />
-            <View>
-              <Text style={[styles.aiHeaderTitle, { color: colors.foreground }]}>AI Assistant</Text>
-              <Text style={[styles.aiHeaderSub, { color: colors.mutedForeground }]}>Powered by Groq AI</Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={() => setShowAI(false)} style={styles.aiCloseBtn}>
-            <Ionicons name="close" size={22} color={colors.foreground} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Messages */}
-        <FlatList
-          ref={aiListRef}
-          data={aiMessages}
-          keyExtractor={(_, i) => String(i)}
-          contentContainerStyle={styles.aiList}
-          onContentSizeChange={() => aiListRef.current?.scrollToEnd({ animated: true })}
-          ListEmptyComponent={
-            <View style={styles.aiEmpty}>
-              <Text style={{ fontSize: 40, marginBottom: 12 }}>🌍</Text>
-              <Text style={[styles.aiEmptyTitle, { color: colors.foreground }]}>
-                Ask me anything about Sarajevo!
-              </Text>
-              <Text style={[styles.aiEmptySub, { color: colors.mutedForeground }]}>
-                Best places, expat tips, local events, real estate advice and more.
-              </Text>
-              <View style={styles.aiSuggestions}>
-                {[
-                  '🏙️ What is Sarajevo Expats?',
-                  '📍 Best places to visit?',
-                  '🏠 How to find housing?',
-                  '🌍 Tips for new expats?',
-                  '🎉 What events are happening?',
-                ].map((q) => (
-                  <TouchableOpacity
-                    key={q}
-                    style={[styles.aiSuggestionChip, { borderColor: colors.primary, backgroundColor: colors.primary + '12' }]}
-                    onPress={() => { setAiInput(q.slice(3)); }}
-                  >
-                    <Text style={[styles.aiSuggestionText, { color: colors.primary }]}>{q}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View style={[
-              styles.aiBubble,
-              item.role === 'user'
-                ? [styles.aiBubbleUser, { backgroundColor: colors.primary }]
-                : [styles.aiBubbleModel, { backgroundColor: colors.card, borderColor: colors.border }],
-            ]}>
-              <Text style={[
-                styles.aiBubbleText,
-                { color: item.role === 'user' ? '#fff' : colors.foreground },
-              ]}>
-                {item.text}
-              </Text>
-            </View>
-          )}
-        />
-
-        {/* Loading indicator */}
-        {aiLoading && (
-          <View style={[styles.aiTyping, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.aiTypingText, { color: colors.mutedForeground }]}>AI is thinking…</Text>
-          </View>
-        )}
-
-        {/* Input */}
-        <View style={[styles.aiInputRow, { borderTopColor: colors.border, paddingBottom: insets.bottom + 8 }]}>
-          <TextInput
-            style={[styles.aiInput, { backgroundColor: colors.muted, color: colors.foreground }]}
-            placeholder="Ask about Sarajevo..."
-            placeholderTextColor={colors.mutedForeground}
-            value={aiInput}
-            onChangeText={setAiInput}
-            onSubmitEditing={sendAiMessage}
-            returnKeyType="send"
-            multiline
-          />
-          <TouchableOpacity
-            style={[styles.aiSendBtn, { backgroundColor: aiInput.trim() ? colors.primary : colors.muted }]}
-            onPress={sendAiMessage}
-            disabled={!aiInput.trim() || aiLoading}
-          >
-            <Ionicons name="send" size={18} color={aiInput.trim() ? '#fff' : colors.mutedForeground} />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    <AiAssistantModal
+      visible={showAI}
+      onClose={() => setShowAI(false)}
+      aiMessages={aiMessages}
+      aiInput={aiInput}
+      setAiInput={setAiInput}
+      aiLoading={aiLoading}
+      aiListRef={aiListRef}
+      sendAiMessage={sendAiMessage}
+      colors={colors}
+      bottomInset={insets.bottom}
+    />
     </View>
   );
 };
@@ -682,7 +567,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderBottomWidth: 1,
   },
-  // Floating AI button
+  // AI float button
   aiFloat: {
     position: 'absolute',
     right: 20,
@@ -701,77 +586,6 @@ const styles = StyleSheet.create({
   aiFloatIcon: { fontSize: 16 },
   aiFloatLogo: { width: 18, height: 18, borderRadius: 4 },
   aiFloatText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  // AI Modal
-  aiModal: { flex: 1 },
-  aiHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  aiHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  aiAvatar: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  aiHeaderTitle: { fontSize: 16, fontWeight: '700' },
-  aiHeaderSub: { fontSize: 12, marginTop: 1 },
-  aiCloseBtn: { padding: 4 },
-  aiList: { padding: 16, gap: 10, flexGrow: 1 },
-  aiEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 32 },
-  aiEmptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
-  aiEmptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  aiSuggestions: { gap: 8, width: '100%' },
-  aiSuggestionChip: {
-    borderWidth: 1, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 10,
-  },
-  aiSuggestionText: { fontSize: 14, fontWeight: '600' },
-  aiBubble: {
-    maxWidth: '80%',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 4,
-  },
-  aiBubbleUser: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  aiBubbleModel: { alignSelf: 'flex-start', borderBottomLeftRadius: 4, borderWidth: 1 },
-  aiBubbleText: { fontSize: 14, lineHeight: 20 },
-  aiTyping: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
-  aiTypingText: { fontSize: 13 },
-  aiInputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    borderTopWidth: 1,
-  },
-  aiInput: {
-    flex: 1,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    maxHeight: 100,
-  },
-  aiSendBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-  },
 });
 
 export default ChatsScreen;
