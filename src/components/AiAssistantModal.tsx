@@ -21,7 +21,7 @@ interface Props {
   aiInput: string;
   setAiInput: (v: string) => void;
   aiLoading: boolean;
-  aiListRef: React.RefObject<FlatList>;
+  aiListRef: React.RefObject<FlatList | null>;
   sendAiMessage: () => void;
   colors: Record<string, string>;
   bottomInset?: number;
