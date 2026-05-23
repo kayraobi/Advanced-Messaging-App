@@ -44,7 +44,7 @@ const SubmitPlaceScreen = () => {
   const pickOnePhoto = async () => {
     if (!(await ensureMediaPermission())) return;
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.85,
     });
     if (!res.canceled && res.assets[0]) {
@@ -55,7 +55,7 @@ const SubmitPlaceScreen = () => {
   const pickMultiplePhotos = async () => {
     if (!(await ensureMediaPermission())) return;
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.85,
       allowsMultipleSelection: true,
     });
