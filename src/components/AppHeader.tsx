@@ -7,10 +7,13 @@ import {
   ScrollView,
   StyleSheet,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useWeather } from '../hooks/useWeather';
+import WeatherModal from './WeatherModal';
 
 const notifications = [
   {
@@ -40,7 +43,9 @@ const AppHeader = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showWeather, setShowWeather] = useState(false);
   const [readIds, setReadIds] = useState<number[]>([]);
+  const { data: weather, loading: weatherLoading } = useWeather();
 
   const unreadCount = notifications.filter((n) => !readIds.includes(n.id)).length;
 
@@ -54,17 +59,36 @@ const AppHeader = () => {
       <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: insets.top + 10 }]}>
         <Text style={styles.title}>Sarajevo Expats</Text>
         <View style={styles.right}>
-          <Text style={styles.weather}>⛅ 14°C</Text>
-          <TouchableOpacity
-            style={styles.bellBtn}
-            onPress={() => setShowNotifs(true)}
-          >
+          {/* Weather button */}
+          <TouchableOpacity onPress={() => setShowWeather(true)} style={styles.weatherBtn}>
+            {weatherLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : weather ? (
+              <View style={styles.weatherRow}>
+                <MaterialCommunityIcons name={weather.headerIcon as any} size={18} color="#fff" />
+                <Text style={styles.weatherText}>{weather.temp}°C</Text>
+              </View>
+            ) : (
+              <Text style={styles.weatherText}>—</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Bell button */}
+          <TouchableOpacity style={styles.bellBtn} onPress={() => setShowNotifs(true)}>
             <Ionicons name="notifications-outline" size={22} color="#fff" />
             {unreadCount > 0 && <View style={styles.badge} />}
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Weather detail modal — own component */}
+      <WeatherModal
+        visible={showWeather}
+        weather={weather}
+        onClose={() => setShowWeather(false)}
+      />
+
+      {/* Notifications modal */}
       <Modal
         visible={showNotifs}
         animationType="slide"
@@ -139,7 +163,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  weather: {
+  weatherBtn: {
+    padding: 4,
+  },
+  weatherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  weatherText: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
     fontWeight: '500',
