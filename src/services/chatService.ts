@@ -6,6 +6,8 @@ export interface Message {
   senderId: string;
   senderName: string;
   message: string;
+  /** Present if backend embeds sender profile on socket/API payload */
+  senderDisplayUrl?: string;
   isDeleted?: boolean;
   createdAt: string;
 }

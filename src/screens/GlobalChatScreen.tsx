@@ -13,24 +13,24 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { socketService } from '../services/socketService';
+import { authService } from '../services/authService';
 import { useGlobalRoom } from '../hooks/useChatRooms';
 import { useUserProfile } from '../hooks/useUserProfile';
 import UserProfileModal from '../components/UserProfileModal';
+import { useChatUserAvatars } from '../hooks/useChatUserAvatars';
+import ChatMessageAvatar from '../components/ChatMessageAvatar';
+import {
+  formatSocketChatMessage,
+  formatSocketChatMessages,
+  type FormattedChatMessage,
+} from '../utils/formatChatMessage';
+import type { User } from '../types/user.types';
+import { seedChatUserAvatar } from '../services/chatAvatarService';
 
-interface ChatMessage {
-  id: string;
-  sender: string;
-  senderId: string;
-  initials: string;
-  text: string;
-  time: string;
-  isMe: boolean;
-  hidden?: boolean;
-}
+interface ChatMessage extends FormattedChatMessage {}
 
 const pollOptions = [
   { label: 'Saturday Evening', votes: 18 },
@@ -45,17 +45,21 @@ const GlobalChatScreen = () => {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [currentUser, setCurrentUser] = useState<{ _id: string; username: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
+  const { getAvatarUrl, prefetchForMessages } = useChatUserAvatars();
 
   const { globalRoom } = useGlobalRoom();
   const roomId = globalRoom?._id;
   const { profilePreview, profileLoading, showProfile, openProfile, closeProfile } = useUserProfile();
 
   useEffect(() => {
-    AsyncStorage.getItem('auth_user').then((raw) => {
-      if (raw) setCurrentUser(JSON.parse(raw));
+    authService.getStoredUser().then((user) => {
+      if (user) {
+        setCurrentUser(user);
+        if (user._id && user.displayUrl) seedChatUserAvatar(user._id, user.displayUrl);
+      }
     });
   }, []);
 
@@ -66,37 +70,19 @@ const GlobalChatScreen = () => {
     const setup = async () => {
       await socketService.connect();
 
-      const handlePrevious = (data: { roomId: string; messages: any[] }) => {
+      const handlePrevious = (data: { roomId: string; messages: unknown[] } | unknown[]) => {
         if (!isMounted) return;
-        const msgs = Array.isArray(data) ? data : data.messages ?? [];
-        const formatted = msgs.map((m) => ({
-          id: m._id ?? m.id,
-          sender: m.senderName,
-          senderId: m.senderId ?? '',
-          initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
-          text: m.message ?? m.content ?? '',
-          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isMe: m.senderId === currentUser?._id,
-          hidden: m.hidden ?? m.isDeleted ?? false,
-        }));
+        const formatted = formatSocketChatMessages(data, currentUser?._id);
         setMessages(formatted);
+        void prefetchForMessages(formatted);
       };
 
-      const handleReceive = (m: any) => {
+      const handleReceive = (m: unknown) => {
         if (!isMounted) return;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: m._id ?? m.id,
-            sender: m.senderName,
-            senderId: m.senderId ?? '',
-            initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
-            text: m.message ?? m.content ?? '',
-            time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isMe: m.senderId === currentUser?._id,
-            hidden: m.hidden ?? m.isDeleted ?? false,
-          },
-        ]);
+        const row = formatSocketChatMessage(m, currentUser?._id);
+        if (!row) return;
+        setMessages((prev) => [...prev, row]);
+        void prefetchForMessages([row]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       };
 
@@ -118,7 +104,7 @@ const GlobalChatScreen = () => {
       isMounted = false;
       promise.then(() => cleanupFn?.());
     };
-  }, [roomId, currentUser]);
+  }, [roomId, currentUser?._id, prefetchForMessages]);
 
   const sendMessage = async () => {
     if (!input.trim() || !roomId) return;
@@ -190,15 +176,24 @@ const GlobalChatScreen = () => {
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.messages}
-        renderItem={({ item: msg }) => (
+        renderItem={({ item: msg }) => {
+          const avatarUrl = getAvatarUrl(msg.senderId, msg.displayUrl);
+
+          return (
           <View style={[styles.msgRow, msg.isMe && styles.msgRowMe]}>
             {!msg.isMe && (
               <TouchableOpacity
-                style={[styles.msgAvatar, { backgroundColor: colors.primary + '1A' }]}
                 onPress={() => openProfile(msg.senderId, msg.sender, msg.initials)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.msgAvatarText, { color: colors.primary }]}>{msg.initials}</Text>
+                <ChatMessageAvatar
+                  displayUrl={avatarUrl}
+                  initials={msg.initials}
+                  size={32}
+                  backgroundColor={colors.primary + '1A'}
+                  textColor={colors.primary}
+                  style={{ marginTop: 4 }}
+                />
               </TouchableOpacity>
             )}
             <View style={[styles.msgBubbleWrap, msg.isMe && { alignItems: 'flex-end' }]}>
@@ -230,7 +225,8 @@ const GlobalChatScreen = () => {
               </Text>
             </View>
           </View>
-        )}
+          );
+        }}
       />
 
       {/* Input */}
@@ -297,18 +293,8 @@ const styles = StyleSheet.create({
   progressBg: { height: 5, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
   messages: { paddingHorizontal: 14, paddingVertical: 12, gap: 12 },
-  msgRow: { flexDirection: 'row', gap: 8 },
+  msgRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
   msgRowMe: { flexDirection: 'row-reverse' },
-  msgAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    flexShrink: 0,
-  },
-  msgAvatarText: { fontSize: 10, fontWeight: '700' },
   msgBubbleWrap: { maxWidth: '75%', gap: 2 },
   msgSender: { fontSize: 10, fontWeight: '600', marginLeft: 4 },
   bubble: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18 },
