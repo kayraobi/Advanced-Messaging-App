@@ -106,9 +106,10 @@ const ExploreScreen = () => {
           try {
             let flat: Place[] = [];
             let chips: PlaceType[] = [];
+
+            // 1. Önce auth gerektiren birleşik endpoint'i dene
             try {
               const grouped = await placeTypesService.getWithPlaces();
-              // API alan adı: name | title | typeName | type — hangisi doluysa onu kullan
               const resolveName = (g: any): string =>
                 g.name || g.title || g.typeName || g.type || g.label || '';
               chips = grouped.map((g) => ({
@@ -116,33 +117,53 @@ const ExploreScreen = () => {
                 name: resolveName(g),
                 icon: g.icon,
               }));
-              flat = grouped.flatMap((g) =>
-                (Array.isArray(g.places) ? g.places : []).map((p) => ({
+              flat = grouped.flatMap((g: any) => {
+                const nestedPlaces = Array.isArray(g.places) ? g.places : Array.isArray(g.subData) ? g.subData : [];
+                return nestedPlaces.map((p: any) => ({
                   ...p,
                   placeType: { _id: g._id, name: resolveName(g) },
-                })),
-              );
+                }));
+              });
             } catch {
-              chips = await placeTypesService.getAll().catch(() => []);
+              // 2. Fallback: auth gerektirmeyen iki endpoint'i paralel çek
+              //    GET /api/placeTypes → kategoriler (auth yok) → { _id, name }
+              //    GET /api/places    → yerler (auth yok)   → { type: "Cafe / Restaurant", ... }
+              const [rawChips, rawPlaces] = await Promise.all([
+                placeTypesService.getAll().catch(() => []),
+                placesService.getAll().catch(() => []),
+              ]);
+              chips = rawChips;
+
+              // API'den gelen her place'in `type` alanı bir string (örn. "Cafe / Restaurant").
+              // Chip'lerle eşleşmesi için bunu { _id: chip._id, name: chip.name } nesnesine dönüştür.
+              const typeNameToChip = new Map(rawChips.map((c) => [c.name.trim().toLowerCase(), c]));
+              flat = rawPlaces.map((p) => {
+                const typeName = typeof p.type === 'string' ? p.type.trim() : '';
+                const matched = typeNameToChip.get(typeName.toLowerCase());
+                return {
+                  ...p,
+                  displayUrl: p.pictures?.[0] ?? p.displayUrl,
+                  placeType: matched
+                    ? { _id: matched._id, name: matched.name }
+                    : typeof p.placeType === 'object'
+                    ? p.placeType
+                    : { _id: typeName, name: typeName },
+                };
+              });
             }
-            if (flat.length === 0) {
-              try {
-                flat = await placesService.getAll();
-                if (chips.length === 0) {
-                  chips = await placeTypesService.getAll().catch(() => []);
-                }
-              } catch { /* 403 veya başka hata — mock'a düş */ }
-            }
-            // API boş veya 403 dönünce mock Saraybosna mekanlarını göster
+
+            // 3. Hâlâ yer yoksa → Saraybosna mock verisine düş
             if (flat.length === 0) {
               flat = MOCK_PLACES;
-              // Mock places kullanılıyorsa chip'leri de mock'tan üret
-              // (API chip ID'leri mock place ID'leriyle eşleşmez)
-              const seen = new Set<string>();
-              chips = flat
-                .map((p) => (typeof p.placeType === 'object' ? p.placeType as PlaceType : null))
-                .filter((t): t is PlaceType => t !== null && !seen.has(t._id) && !!seen.add(t._id));
+              // Gerçek chip'ler yoksa mock yerlerden üret (ID'ler uyuşsun diye)
+              if (chips.length === 0) {
+                const seen = new Set<string>();
+                chips = flat
+                  .map((p) => (typeof p.placeType === 'object' ? p.placeType as PlaceType : null))
+                  .filter((t): t is PlaceType => t !== null && !seen.has(t._id) && !!seen.add(t._id));
+              }
             }
+
             setPlaceTypes(chips);
             placesBaselineRef.current = flat;
             setPlaces(flat);
@@ -412,40 +433,42 @@ const ExploreScreen = () => {
       </View>
 
       {/* Tab bar */}
-      <View style={styles.tabBar}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          const color = TAB_COLORS[t.key];
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[
-                styles.tabBtn,
-                active && { backgroundColor: color + '15', borderColor: color, borderWidth: 1.5 },
-                !active && { borderColor: colors.border, borderWidth: 1 },
-                { backgroundColor: active ? color + '15' : colors.card },
-              ]}
-              onPress={() => {
-                if (tab === 'places' && t.key !== 'places') {
-                  setPlaces(placesBaselineRef.current);
-                }
-                if (tab === 'services' && t.key !== 'services') {
-                  setServices(servicesBaselineRef.current);
-                }
-                setTab(t.key);
-                setSearch('');
-                setActiveTypeFilter(null);
-                setReMode('all');
-                setReTypeSlug(null);
-              }}
-            >
-              <Ionicons name={t.icon as any} size={14} color={active ? color : colors.mutedForeground} />
-              <Text style={[styles.tabText, { color: active ? color : colors.mutedForeground }]} numberOfLines={1}>
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      <View style={{ paddingBottom: 10 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            const color = TAB_COLORS[t.key];
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[
+                  styles.tabBtn,
+                  active && { backgroundColor: color + '15', borderColor: color, borderWidth: 1.5 },
+                  !active && { borderColor: colors.border, borderWidth: 1 },
+                  { backgroundColor: active ? color + '15' : colors.card },
+                ]}
+                onPress={() => {
+                  if (tab === 'places' && t.key !== 'places') {
+                    setPlaces(placesBaselineRef.current);
+                  }
+                  if (tab === 'services' && t.key !== 'services') {
+                    setServices(servicesBaselineRef.current);
+                  }
+                  setTab(t.key);
+                  setSearch('');
+                  setActiveTypeFilter(null);
+                  setReMode('all');
+                  setReTypeSlug(null);
+                }}
+              >
+                <Ionicons name={t.icon as any} size={14} color={active ? color : colors.mutedForeground} />
+                <Text style={[styles.tabText, { color: active ? color : colors.mutedForeground }]} numberOfLines={1}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16, paddingBottom: 8 }}>
@@ -696,13 +719,13 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14 },
   tabBar: {
     flexDirection: 'row', gap: 8,
-    paddingHorizontal: 16, paddingBottom: 10,
+    paddingHorizontal: 16,
   },
   tabBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 4, paddingVertical: 8, borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10,
   },
-  tabText: { fontSize: 11, fontWeight: '700' },
+  tabText: { fontSize: 13, fontWeight: '700' },
   list: { paddingHorizontal: 16, paddingBottom: 40, gap: 14 },
   card: {
     borderRadius: 16, overflow: 'hidden', borderWidth: 1,
@@ -727,9 +750,9 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 8 },
   chipText: { fontSize: 11 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 60 },
-  filterChips: { paddingHorizontal: 16, paddingBottom: 10, gap: 8, flexDirection: 'row', alignItems: 'center' },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, minWidth: 60, alignItems: 'center' },
-  filterChipText: { fontSize: 12, fontWeight: '700' },
+  filterChips: { paddingHorizontal: 16, paddingVertical: 10, gap: 8, flexDirection: 'row', alignItems: 'center' },
+  filterChip: { height: 36, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1.5, minWidth: 60, alignItems: 'center', justifyContent: 'center' },
+  filterChipText: { fontSize: 13, fontWeight: '700' },
   quickLink: {
     flexDirection: 'row',
     alignItems: 'center',
