@@ -10,12 +10,14 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { events } from '../data/events';
 import { socketService } from '../services/socketService';
+import { chatService } from '../services/chatService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserProfile } from '../hooks/useUserProfile';
 import UserProfileModal from '../components/UserProfileModal';
@@ -56,6 +58,8 @@ const ChatDetailScreen = () => {
   const [input, setInput] = useState('');
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
   const [showPoll, setShowPoll] = useState(true);
+  const [isLoadingOld, setIsLoadingOld] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [currentUser, setCurrentUser] = useState<{ _id: string; username: string } | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -88,24 +92,21 @@ const ChatDetailScreen = () => {
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isMe: m.senderId === currentUser?._id,
         }));
-        setMessages(formatted);
+        setMessages(formatted.reverse());
       };
 
       const handleReceive = (m: any) => {
         if (!isMounted) return;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: m._id ?? m.id,
-            sender: m.senderName,
-            senderId: m.senderId ?? '',
-            initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
-            text: m.message ?? m.content ?? '',
-            time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isMe: m.senderId === currentUser?._id,
-          },
-        ]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        const newMessage = {
+          id: m._id ?? m.id,
+          sender: m.senderName,
+          senderId: m.senderId ?? '',
+          initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
+          text: m.message ?? m.content ?? '',
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: m.senderId === currentUser?._id,
+        };
+        setMessages((prev) => [newMessage, ...prev]);
       };
 
       socketService.on('previous_messages', handlePrevious);
@@ -133,6 +134,35 @@ const ChatDetailScreen = () => {
     await socketService.connect();
     socketService.sendMessage(socketRoomId, input.trim());
     setInput('');
+  };
+
+  const loadOlderMessages = async () => {
+    if (isLoadingOld || !hasMore || !socketRoomId) return;
+    setIsLoadingOld(true);
+    try {
+      // Elimizdeki mesaj sayısı kadar (skip) atlayıp, İbrahim'in API'sinden eskileri çekiyoruz
+      const response = await chatService.getRoomMessages(socketRoomId, 30, messages.length);
+      
+      if (response.messages.length > 0) {
+        const formattedOldMsgs = response.messages.map((m: any) => ({
+          id: m._id ?? m.id,
+          sender: m.senderName,
+          senderId: m.senderId ?? '',
+          initials: m.senderName?.substring(0, 2).toUpperCase() ?? '??',
+          text: m.message ?? m.content ?? '',
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: m.senderId === currentUser?._id,
+        }));
+        // NOT: Liste inverted olduğu için eski mesajlar dizinin SONUNA eklenmelidir!
+        setMessages((prev) => [...prev, ...formattedOldMsgs]);
+      }
+      
+      setHasMore(response.hasMore);
+    } catch (error) {
+      console.error("Eski mesajlar çekilemedi", error);
+    } finally {
+      setIsLoadingOld(false);
+    }
   };
 
   return (
@@ -207,6 +237,12 @@ const ChatDetailScreen = () => {
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.messages}
+        inverted={true}
+        onEndReached={loadOlderMessages}
+        onEndReachedThreshold={0.2}
+        ListFooterComponent={
+          isLoadingOld ? <ActivityIndicator size="small" color={colors.primary} style={{ margin: 10 }} /> : null
+        }
         renderItem={({ item: msg }) => (
           <View style={[styles.msgRow, msg.isMe && styles.msgRowMe]}>
             {!msg.isMe && (
