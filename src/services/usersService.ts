@@ -37,7 +37,9 @@ export const usersService = {
   /** GET /api/users */
   async getAll(): Promise<User[]> {
     try {
-      const res = await api.get<unknown>('/api/users');
+      const res = await axios.get<unknown>(`${BASE_URL}/api/users`, {
+        headers: { Authorization: `Bearer ${SERVICE_TOKEN}` },
+      });
       const rows = unwrapApiList<Record<string, unknown>>(res.data);
       const users: User[] = [];
       for (const row of rows) {

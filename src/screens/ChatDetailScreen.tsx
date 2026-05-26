@@ -31,44 +31,7 @@ interface ChatMessage {
   isMe: boolean;
 }
 
-const dmProfiles: Record<string, { name: string; initials: string; status: string }> = {
-  'dm-1': { name: 'Yahia (Admin)', initials: 'YA', status: 'Online' },
-  'dm-2': { name: 'Amar Kovačević', initials: 'AK', status: 'Active recently' },
-  'dm-3': { name: 'Hana Begović', initials: 'HB', status: 'Online' },
-  'dm-4': { name: 'Kayra Tanović', initials: 'KT', status: 'Active 2h ago' },
-  'dm-5': { name: 'Mirza Redžić', initials: 'MR', status: 'Active recently' },
-  'dm-6': { name: 'Sara Bašić', initials: 'SB', status: 'Active 1d ago' },
-};
 
-const dmMessages: Record<string, ChatMessage[]> = {
-  'dm-1': [
-    { id: '1', sender: 'Yahia', senderId: '', initials: 'YA', text: 'Welcome to the community! Let me know if you need anything 🙌', time: '9:00 AM', isMe: false },
-    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Thanks Yahia! Excited to be here.', time: '9:05 AM', isMe: true },
-    { id: '3', sender: 'Yahia', senderId: '', initials: 'YA', text: 'Check out the events page, lots happening this week!', time: '9:06 AM', isMe: false },
-  ],
-  'dm-2': [
-    { id: '1', sender: 'Amar', senderId: '', initials: 'AK', text: 'Hey! Are you coming to the basketball game?', time: '2:30 PM', isMe: false },
-    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Definitely! What time does it start?', time: '2:35 PM', isMe: true },
-    { id: '3', sender: 'Amar', senderId: '', initials: 'AK', text: '6 PM at the outdoor court. Bring water!', time: '2:37 PM', isMe: false },
-  ],
-  'dm-3': [
-    { id: '1', sender: 'You', senderId: '', initials: 'TT', text: 'Hey Hana! Do you know any good restaurants near Baščaršija?', time: '11:00 AM', isMe: true },
-    { id: '2', sender: 'Hana', senderId: '', initials: 'HB', text: 'Try Dveri! Amazing Bosnian food 😊', time: '11:10 AM', isMe: false },
-    { id: '3', sender: 'You', senderId: '', initials: 'TT', text: 'Thanks for the recommendation!', time: '11:12 AM', isMe: true },
-  ],
-  'dm-4': [
-    { id: '1', sender: 'Kayra', senderId: '', initials: 'KT', text: "Let's grab coffee sometime this week ☕", time: '4:00 PM', isMe: false },
-    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Sure! Wednesday afternoon works for me', time: '4:15 PM', isMe: true },
-  ],
-  'dm-5': [
-    { id: '1', sender: 'Mirza', senderId: '', initials: 'MR', text: "I'll send you the details tomorrow", time: '6:00 PM', isMe: false },
-    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Sounds good, thanks!', time: '6:05 PM', isMe: true },
-  ],
-  'dm-6': [
-    { id: '1', sender: 'Sara', senderId: '', initials: 'SB', text: 'Great meeting you at the event! 🎉', time: '10:00 PM', isMe: false },
-    { id: '2', sender: 'You', senderId: '', initials: 'TT', text: 'Likewise! Hope to see you at the next one', time: '10:05 PM', isMe: true },
-  ],
-};
 
 const pollOptions = [
   { label: 'Saturday Evening', votes: 18 },
@@ -83,17 +46,13 @@ const ChatDetailScreen = () => {
   const { chatId, roomId: roomIdParam, dmPeerName } = route.params;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const isMockDm = chatId.startsWith('dm-') && !roomIdParam;
-  const isDm = isMockDm || !!dmPeerName;
-  const dmProfile = isMockDm ? dmProfiles[chatId] : null;
+  const isDm = !!dmPeerName;
   const event = !isDm ? events.find((e) => e.id === chatId) : null;
 
-  const socketRoomId = roomIdParam ?? (!isMockDm && !isDm ? chatId : null);
+  const socketRoomId = roomIdParam ?? (!isDm ? chatId : null);
   useActiveChatRoom(socketRoomId);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    isMockDm ? (dmMessages[chatId] ?? []) : [],
-  );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
   const [showPoll, setShowPoll] = useState(true);
@@ -102,7 +61,7 @@ const ChatDetailScreen = () => {
 
   const { profilePreview, profileLoading, showProfile, openProfile, closeProfile } = useUserProfile();
 
-  const chatTitle = dmPeerName ?? dmProfile?.name ?? event?.title ?? 'Chat';
+  const chatTitle = dmPeerName ?? event?.title ?? 'Chat';
 
   useEffect(() => {
     AsyncStorage.getItem('auth_user').then((raw) => {
@@ -111,7 +70,7 @@ const ChatDetailScreen = () => {
   }, []);
 
   useEffect(() => {
-    if (isMockDm || !socketRoomId) return;
+    if (!socketRoomId) return;
     let isMounted = true;
 
     const setup = async () => {
@@ -169,24 +128,7 @@ const ChatDetailScreen = () => {
   }, [chatId, socketRoomId, currentUser, isDm]);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
-
-    if (isMockDm || !socketRoomId) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: String(Date.now()),
-          sender: 'You',
-          senderId: '',
-          initials: 'YO',
-          text: input.trim(),
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isMe: true,
-        },
-      ]);
-      setInput('');
-      return;
-    }
+    if (!input.trim() || !socketRoomId) return;
 
     await socketService.connect();
     socketService.sendMessage(socketRoomId, input.trim());
@@ -210,7 +152,7 @@ const ChatDetailScreen = () => {
           </Text>
           {isDm && (
             <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-              {dmProfile?.status ?? 'Direct Message'}
+              Direct Message
             </Text>
           )}
         </View>
