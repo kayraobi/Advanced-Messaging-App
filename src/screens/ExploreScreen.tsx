@@ -508,6 +508,11 @@ const ExploreScreen = () => {
             </TouchableOpacity>
           </>
         ) : null}
+        {(tab === 'places' || tab === 'realEstate') && (
+          <Text style={[styles.mapHint, { color: colors.mutedForeground }]}>
+            Pins move to real spots after ~20s if the server has no coordinates (background lookup).
+          </Text>
+        )}
       </View>
 
       {/* Count */}
@@ -763,6 +768,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   quickLinkText: { fontSize: 13, fontWeight: '700' },
+  mapHint: { fontSize: 11, lineHeight: 16, marginTop: 8, paddingHorizontal: 2 },
 });
 
 export default ExploreScreen;

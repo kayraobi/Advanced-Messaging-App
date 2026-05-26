@@ -1,4 +1,7 @@
-import { parseEventCoordinates } from '../utils/mapCoordinates';
+import {
+  extractCoordinatesFromText,
+  parseEventCoordinates,
+} from '../utils/mapCoordinates';
 
 describe('parseEventCoordinates', () => {
   // ── Positive test cases ──────────────────────────────────────────────────
@@ -68,5 +71,28 @@ describe('parseEventCoordinates', () => {
   test('returns null for non-numeric string coordinates', () => {
     const result = parseEventCoordinates({ latitude: 'abc', longitude: 'xyz' });
     expect(result).toBeNull();
+  });
+
+  test('extracts coordinates from Google Maps link in content HTML', () => {
+    const html =
+      '<a href="https://www.google.com/maps/place/@43.8592699,18.4218194,17z">Mula Mustafe</a>';
+    const result = parseEventCoordinates({ content: html });
+    expect(result).not.toBeNull();
+    expect(result!.latitude).toBeCloseTo(43.8592699, 4);
+    expect(result!.longitude).toBeCloseTo(18.4218194, 4);
+  });
+
+  test('extracts 3d/4d Google Maps coordinates', () => {
+    const url =
+      'https://maps.google.com/?q=place&3d43.8592699!4d18.4243943';
+    expect(extractCoordinatesFromText(url)).toEqual({
+      latitude: 43.8592699,
+      longitude: 18.4243943,
+    });
+  });
+
+  test('swaps lat/lng when values look reversed for Bosnia', () => {
+    const result = parseEventCoordinates({ latitude: 18.4131, longitude: 43.8563 });
+    expect(result).toEqual({ latitude: 43.8563, longitude: 18.4131 });
   });
 });

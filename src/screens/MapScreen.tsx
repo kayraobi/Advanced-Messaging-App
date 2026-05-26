@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -14,40 +15,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { placesService } from '../services/placesService';
 import { realEstateService } from '../services/realEstateService';
+import { geocodeAddressCached } from '../services/geocodeService';
+import { buildPinFromItem, type MapPin } from '../utils/mapPins';
+import {
+  buildGeocodeQuery,
+  extractAddressFromItem,
+  parseItemCoordinates,
+} from '../utils/mapCoordinates';
 
-// Nominatim geocoding — OpenStreetMap, ücretsiz, API key yok
-async function geocodeAddress(address: string): Promise<[number, number] | null> {
-  try {
-    const query = encodeURIComponent(`${address}, Sarajevo`);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
-      { headers: { 'User-Agent': 'SarajevoExpatsApp/1.0' } },
-    );
-    const data = await res.json();
-    if (data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-  } catch { /* sessizce geç */ }
-  return null;
-}
+/** Nominatim rate limit ~1/s; cap background jobs for large lists */
+const MAX_BACKGROUND_GEOCODE = 24;
 
-// Adres yoksa Saraybosna etrafında altın açı ile dağıt
-function fallbackLatLng(index: number): [number, number] {
-  const angle = index * 2.39996; // golden angle radians
-  const r = 0.01 + (index % 5) * 0.006;
-  return [43.8476 + Math.sin(angle) * r, 18.3564 + Math.cos(angle) * r];
-}
-
-interface Pin {
-  id: string;
-  title: string;
-  address: string;
-  image: string;
-  badge: string;
-  lat: number;
-  lng: number;
-  itemId: string;
-}
-
-function buildLeafletHTML(pins: Pin[], accentColor: string): string {
+function buildLeafletHTML(pins: MapPin[], accentColor: string): string {
   const pinsJson = JSON.stringify(pins);
   return `<!DOCTYPE html>
 <html>
@@ -63,6 +42,7 @@ function buildLeafletHTML(pins: Pin[], accentColor: string): string {
     box-shadow: 0 4px 20px rgba(0,0,0,0.18);
     border: none;
   }
+  .custom-popup .leaflet-popup-content-wrapper { border-radius: 14px; }
   .custom-popup .leaflet-popup-tip { background: #fff; }
   .popup-img { width: 100%; height: 110px; object-fit: cover; background: #eee; }
   .popup-img-placeholder {
@@ -79,6 +59,7 @@ function buildLeafletHTML(pins: Pin[], accentColor: string): string {
   }
   .popup-title { font-size: 13px; font-weight: 700; color: #111; margin-bottom: 2px; }
   .popup-addr { font-size: 11px; color: #888; margin-bottom: 6px; }
+  .popup-approx { font-size: 10px; color: #b45309; margin-bottom: 6px; font-weight: 600; }
   .popup-btn {
     width: 100%; padding: 7px; border: none; border-radius: 8px;
     background: ${accentColor}; color: #fff; font-size: 12px;
@@ -91,6 +72,7 @@ function buildLeafletHTML(pins: Pin[], accentColor: string): string {
     box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     font-size: 13px;
   }
+  .dot-marker.approx { border-color: #fbbf24; }
 </style>
 </head>
 <body>
@@ -98,7 +80,7 @@ function buildLeafletHTML(pins: Pin[], accentColor: string): string {
 <script>
   const map = L.map('map', { zoomControl: true }).setView([43.8476, 18.3564], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
+    attribution: '© OpenStreetMap',
     maxZoom: 19,
   }).addTo(map);
 
@@ -109,7 +91,7 @@ function buildLeafletHTML(pins: Pin[], accentColor: string): string {
     pins.forEach(pin => {
       const icon = L.divIcon({
         className: '',
-        html: '<div class="dot-marker">' + (pin.badge ? pin.badge.charAt(0) : '📍') + '</div>',
+        html: '<div class="dot-marker' + (pin.approximate ? ' approx' : '') + '">' + (pin.badge ? pin.badge.charAt(0) : '📍') + '</div>',
         iconSize: [28, 28],
         iconAnchor: [14, 14],
         popupAnchor: [0, -16],
@@ -123,30 +105,54 @@ function buildLeafletHTML(pins: Pin[], accentColor: string): string {
         ? '<span class="popup-badge">' + pin.badge + '</span><br/>'
         : '';
 
+      const approxHtml = pin.approximate
+        ? '<div class="popup-approx">~ approximate location</div>'
+        : '';
+
       const popupContent =
-        '<div>' +
-        imgHtml +
-        '<div class="popup-body">' +
-        badgeHtml +
+        '<div>' + imgHtml +
+        '<div class="popup-body">' + badgeHtml +
         '<div class="popup-title">' + pin.title + '</div>' +
         '<div class="popup-addr">' + pin.address + '</div>' +
+        approxHtml +
         '<button class="popup-btn" onclick="window.ReactNativeWebView.postMessage(\\'' + pin.itemId + '\\')">View Details →</button>' +
         '</div></div>';
 
-      const marker = L.marker([pin.lat, pin.lng], { icon })
+      L.marker([pin.lat, pin.lng], { icon })
         .bindPopup(popupContent, { className: 'custom-popup', maxWidth: 220, minWidth: 220 })
         .addTo(map);
 
       bounds.push([pin.lat, pin.lng]);
     });
 
-    try {
-      map.fitBounds(bounds, { padding: [60, 40] });
-    } catch(e) {}
+    try { map.fitBounds(bounds, { padding: [60, 40] }); } catch(e) {}
   }
 </script>
 </body>
 </html>`;
+}
+
+function MapWebUnsupported({ onBack, insetsTop }: { onBack: () => void; insetsTop: number }) {
+  return (
+    <View style={styles.unsupportedRoot}>
+      <View style={[styles.header, { paddingTop: insetsTop + 8 }]}>
+        <TouchableOpacity style={styles.circleBtn} onPress={onBack}>
+          <Ionicons name="chevron-back" size={22} color="#333" />
+        </TouchableOpacity>
+        <View style={styles.titlePill}>
+          <Text style={styles.titleText}>Map</Text>
+        </View>
+      </View>
+      <View style={styles.unsupportedBody}>
+        <Ionicons name="phone-portrait-outline" size={48} color="#888" />
+        <Text style={styles.unsupportedTitle}>Map needs a phone</Text>
+        <Text style={styles.unsupportedText}>
+          The interactive map uses WebView and does not work in the browser (npm run web).
+          Open the app in Expo Go on your phone or in an Android/iOS simulator.
+        </Text>
+      </View>
+    </View>
+  );
 }
 
 const MapScreen = () => {
@@ -157,62 +163,89 @@ const MapScreen = () => {
   const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
 
-  const [pins, setPins] = useState<Pin[]>([]);
+  const [pins, setPins] = useState<MapPin[]>([]);
+  const [mapKey, setMapKey] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [htmlReady, setHtmlReady] = useState(false);
+  const [geocodingBg, setGeocodingBg] = useState(0);
+  const [approximateCount, setApproximateCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const accentColor = type === 'places' ? '#f97316' : '#10b981';
   const screenTitle = type === 'places' ? 'Places Map' : 'Real Estate Map';
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
+
     let cancelled = false;
+
     const run = async () => {
       setLoading(true);
+      setLoadError(null);
       try {
-        const items = type === 'places'
-          ? await placesService.getAll()
-          : await realEstateService.getAll();
+        const items =
+          type === 'places'
+            ? await placesService.getAll()
+            : await realEstateService.getAll();
 
         if (cancelled) return;
-        setTotal(items.length);
 
-        const result: Pin[] = [];
-        for (let i = 0; i < items.length; i++) {
+        const initialPins = items.map((item, i) =>
+          buildPinFromItem(item as Record<string, unknown>, i, type),
+        );
+        const approx = initialPins.filter((p) => p.approximate).length;
+
+        setPins(initialPins);
+        setApproximateCount(approx);
+        setMapKey((k) => k + 1);
+        setLoading(false);
+
+        const toGeocode = items
+          .map((item, index) => ({ item: item as Record<string, unknown>, index }))
+          .filter(({ item }) => !parseItemCoordinates(item))
+          .filter(({ item }) => buildGeocodeQuery(item).length > 0)
+          .slice(0, MAX_BACKGROUND_GEOCODE);
+
+        if (toGeocode.length === 0 || cancelled) return;
+
+        setGeocodingBg(toGeocode.length);
+        const updated = [...initialPins];
+
+        for (let j = 0; j < toGeocode.length; j++) {
           if (cancelled) return;
-          const item = items[i] as any;
-          const title = item.name ?? item.title ?? 'Item';
-          const address = item.address ?? item.location ?? '';
-          const image = item.displayUrl ?? item.pictures?.[0] ?? '';
-          const badge = type === 'places'
-            ? (typeof item.placeType === 'object' ? item.placeType?.name : item.placeType) ?? ''
-            : (typeof item.realEstateType === 'object' ? item.realEstateType?.name : item.realEstateType ?? item.type) ?? '';
-
-          let coords: [number, number] | null = null;
-          if (item.latitude && item.longitude) {
-            coords = [parseFloat(item.latitude), parseFloat(item.longitude)];
-          } else if (address) {
-            coords = await geocodeAddress(address);
-            await new Promise(r => setTimeout(r, 250)); // Nominatim rate limit
+          const { item, index } = toGeocode[j];
+          const query = buildGeocodeQuery(item);
+          const coords = await geocodeAddressCached(query);
+          if (coords) {
+            updated[index] = {
+              ...updated[index],
+              lat: coords.latitude,
+              lng: coords.longitude,
+              approximate: false,
+              address: extractAddressFromItem(item) || updated[index].address,
+            };
+            setPins([...updated]);
+            setApproximateCount(updated.filter((p) => p.approximate).length);
+            setMapKey((k) => k + 1);
           }
-          if (!coords) coords = fallbackLatLng(i);
-
-          result.push({ id: item._id + i, title, address: address || 'Sarajevo', image, badge, lat: coords[0], lng: coords[1], itemId: item._id });
-          if (!cancelled) setProgress(i + 1);
+          if (!cancelled) setGeocodingBg(toGeocode.length - j - 1);
         }
+      } catch (e) {
         if (!cancelled) {
-          setPins(result);
-          setHtmlReady(true);
+          setLoadError(e instanceof Error ? e.message : 'Could not load map data');
+          setLoading(false);
         }
-      } catch { /* show what we have */ }
-      finally { if (!cancelled) setLoading(false); }
+      } finally {
+        if (!cancelled) setGeocodingBg(0);
+      }
     };
-    run();
-    return () => { cancelled = true; };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [type]);
 
-  const handleMessage = (event: any) => {
+  const handleMessage = (event: { nativeEvent: { data: string } }) => {
     const itemId = event.nativeEvent.data;
     if (!itemId) return;
     if (type === 'places') {
@@ -222,11 +255,22 @@ const MapScreen = () => {
     }
   };
 
+  if (Platform.OS === 'web') {
+    return (
+      <MapWebUnsupported
+        onBack={() => navigation.goBack()}
+        insetsTop={insets.top}
+      />
+    );
+  }
+
+  const exactCount = pins.length - approximateCount;
+
   return (
     <View style={styles.container}>
-      {/* Map */}
-      {htmlReady && (
+      {!loading && pins.length > 0 && (
         <WebView
+          key={mapKey}
           ref={webViewRef}
           style={styles.map}
           source={{ html: buildLeafletHTML(pins, accentColor) }}
@@ -236,7 +280,6 @@ const MapScreen = () => {
         />
       )}
 
-      {/* Header — float above map */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={styles.circleBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={22} color="#333" />
@@ -244,7 +287,7 @@ const MapScreen = () => {
 
         <View style={styles.titlePill}>
           <Text style={styles.titleText}>{screenTitle}</Text>
-          {!loading && (
+          {!loading && pins.length > 0 && (
             <View style={[styles.countBadge, { backgroundColor: accentColor }]}>
               <Text style={styles.countText}>{pins.length}</Text>
             </View>
@@ -252,19 +295,48 @@ const MapScreen = () => {
         </View>
       </View>
 
-      {/* Loading overlay */}
+      {geocodingBg > 0 && (
+        <View style={[styles.bgBanner, { top: insets.top + 58 }]}>
+          <ActivityIndicator size="small" color={accentColor} />
+          <Text style={styles.bgBannerText}>
+            Improving {geocodingBg} location{geocodingBg > 1 ? 's' : ''}…
+          </Text>
+        </View>
+      )}
+
+      {!loading && approximateCount > 0 && geocodingBg === 0 && (
+        <View style={[styles.hintBanner, { top: insets.top + 58 }]}>
+          <Text style={styles.hintBannerText}>
+            {exactCount} exact · {approximateCount} approximate — add latitude/longitude in listings for faster maps
+          </Text>
+        </View>
+      )}
+
       {loading && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingCard}>
             <ActivityIndicator size="large" color={accentColor} />
-            <Text style={styles.loadingTitle}>
-              {total === 0 ? 'Fetching locations…' : `Geocoding ${progress} / ${total}`}
-            </Text>
-            {total > 0 && (
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { backgroundColor: accentColor, width: `${Math.round((progress / total) * 100)}%` as any }]} />
-              </View>
-            )}
+            <Text style={styles.loadingTitle}>Loading map…</Text>
+            <Text style={styles.loadingSub}>Pins with coordinates appear instantly</Text>
+          </View>
+        </View>
+      )}
+
+      {!loading && loadError && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <Ionicons name="alert-circle-outline" size={40} color="#ef4444" />
+            <Text style={styles.loadingTitle}>{loadError}</Text>
+          </View>
+        </View>
+      )}
+
+      {!loading && !loadError && pins.length === 0 && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <Ionicons name="map-outline" size={40} color="#888" />
+            <Text style={styles.loadingTitle}>No locations to show</Text>
+            <Text style={styles.loadingSub}>Add places or listings with addresses first</Text>
           </View>
         </View>
       )}
@@ -275,9 +347,21 @@ const MapScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#e8e0d8' },
   map: { flex: 1 },
+  unsupportedRoot: { flex: 1, backgroundColor: '#f5f5f5' },
+  unsupportedBody: {
+    flex: 1,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  unsupportedTitle: { fontSize: 18, fontWeight: '700', color: '#222' },
+  unsupportedText: { fontSize: 14, color: '#555', textAlign: 'center', lineHeight: 22 },
   header: {
     position: 'absolute',
-    top: 0, left: 0, right: 0,
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -285,43 +369,87 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   circleBtn: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.93)',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15, shadowRadius: 4, elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 5,
   },
   titlePill: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.93)',
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15, shadowRadius: 4, elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 5,
   },
   titleText: { fontSize: 14, fontWeight: '700', color: '#111' },
   countBadge: { borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
   countText: { fontSize: 11, color: '#fff', fontWeight: '700' },
+  bgBanner: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  bgBannerText: { fontSize: 12, color: '#444', fontWeight: '600' },
+  hintBanner: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    backgroundColor: 'rgba(255,251,235,0.95)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  hintBannerText: { fontSize: 11, color: '#92400e', lineHeight: 16 },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.30)',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingCard: {
-    backgroundColor: '#fff', borderRadius: 18,
-    padding: 28, alignItems: 'center', gap: 14, minWidth: 220,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 28,
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 220,
+    maxWidth: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18, shadowRadius: 14, elevation: 10,
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 10,
   },
-  loadingTitle: { fontSize: 14, color: '#444', fontWeight: '600' },
-  progressTrack: {
-    width: 180, height: 5, borderRadius: 3,
-    backgroundColor: '#eee', overflow: 'hidden',
-  },
-  progressFill: { height: '100%', borderRadius: 3 },
+  loadingTitle: { fontSize: 14, color: '#444', fontWeight: '600', textAlign: 'center' },
+  loadingSub: { fontSize: 12, color: '#888', textAlign: 'center' },
 });
 
 export default MapScreen;
