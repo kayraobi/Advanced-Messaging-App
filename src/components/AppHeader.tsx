@@ -13,45 +13,17 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeather } from '../hooks/useWeather';
+import { useNotifications } from '../hooks/useNotifications';
+import { formatNotificationTime } from '../utils/notificationTime';
 import WeatherModal from './WeatherModal';
-
-const notifications = [
-  {
-    id: 1,
-    emoji: '📅',
-    title: 'Reminder: Pizza Tour starts in 2 hours!',
-    time: '2 hours ago',
-    unread: true,
-  },
-  {
-    id: 2,
-    emoji: '💬',
-    title: 'Amar mentioned you in Global Chat',
-    time: '4 hours ago',
-    unread: true,
-  },
-  {
-    id: 3,
-    emoji: '⛅',
-    title: 'Weather Alert: Light rain expected during your Trebević Hike tomorrow',
-    time: '6 hours ago',
-    unread: true,
-  },
-];
 
 const AppHeader = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showWeather, setShowWeather] = useState(false);
-  const [readIds, setReadIds] = useState<number[]>([]);
+  const { notifications, unreadCount, markAsRead } = useNotifications();
   const { data: weather, loading: weatherLoading } = useWeather();
-
-  const unreadCount = notifications.filter((n) => !readIds.includes(n.id)).length;
-
-  const markAsRead = (id: number) => {
-    setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  };
 
   return (
     <>
@@ -81,7 +53,6 @@ const AppHeader = () => {
         </View>
       </View>
 
-      {/* Weather detail modal — own component */}
       <WeatherModal
         visible={showWeather}
         weather={weather}
@@ -106,37 +77,49 @@ const AppHeader = () => {
             </TouchableOpacity>
           </View>
           <ScrollView>
-            {notifications.map((n) => {
-              const isUnread = !readIds.includes(n.id);
-              return (
+            {notifications.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  No notifications yet
+                </Text>
+              </View>
+            ) : (
+              notifications.map((n) => (
                 <TouchableOpacity
                   key={n.id}
                   onPress={() => markAsRead(n.id)}
                   style={[
                     styles.notifRow,
                     { borderBottomColor: colors.border },
-                    isUnread && { backgroundColor: colors.primary + '0D' },
+                    !n.isRead && { backgroundColor: colors.primary + '0D' },
                   ]}
                 >
                   <View style={[styles.notifIcon, { backgroundColor: colors.primary + '1A' }]}>
                     <Text style={styles.notifEmoji}>{n.emoji}</Text>
-                    {isUnread && <View style={styles.notifDot} />}
+                    {!n.isRead && <View style={styles.notifDot} />}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text
                       style={[
                         styles.notifText,
-                        { color: isUnread ? colors.foreground : colors.mutedForeground },
-                        isUnread && { fontWeight: '600' },
+                        { color: !n.isRead ? colors.foreground : colors.mutedForeground },
+                        !n.isRead && { fontWeight: '600' },
                       ]}
                     >
                       {n.title}
                     </Text>
-                    <Text style={[styles.notifTime, { color: colors.mutedForeground }]}>{n.time}</Text>
+                    {!!n.body && (
+                      <Text style={[styles.notifBody, { color: colors.mutedForeground }]} numberOfLines={2}>
+                        {n.body}
+                      </Text>
+                    )}
+                    <Text style={[styles.notifTime, { color: colors.mutedForeground }]}>
+                      {formatNotificationTime(n.createdAt)}
+                    </Text>
                   </View>
                 </TouchableOpacity>
-              );
-            })}
+              ))
+            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -208,6 +191,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  emptyWrap: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+  },
   notifRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -241,6 +231,11 @@ const styles = StyleSheet.create({
   notifText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  notifBody: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
   notifTime: {
     fontSize: 11,

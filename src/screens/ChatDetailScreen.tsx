@@ -19,6 +19,7 @@ import { socketService } from '../services/socketService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserProfile } from '../hooks/useUserProfile';
 import UserProfileModal from '../components/UserProfileModal';
+import { useActiveChatRoom } from '../hooks/useActiveChatRoom';
 
 interface ChatMessage {
   id: string;
@@ -88,6 +89,7 @@ const ChatDetailScreen = () => {
   const event = !isDm ? events.find((e) => e.id === chatId) : null;
 
   const socketRoomId = roomIdParam ?? (!isMockDm && !isDm ? chatId : null);
+  useActiveChatRoom(socketRoomId);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
     isMockDm ? (dmMessages[chatId] ?? []) : [],
@@ -154,7 +156,6 @@ const ChatDetailScreen = () => {
       return () => {
         socketService.off('previous_messages', handlePrevious);
         socketService.off('receive_message', handleReceive);
-        socketService.leaveRoom(socketRoomId);
       };
     };
 

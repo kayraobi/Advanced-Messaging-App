@@ -29,6 +29,7 @@ import {
 } from '../utils/formatChatMessage';
 import type { User } from '../types/user.types';
 import { seedChatUserAvatar } from '../services/chatAvatarService';
+import { useActiveChatRoom } from '../hooks/useActiveChatRoom';
 
 interface ChatMessage extends FormattedChatMessage {}
 
@@ -52,6 +53,7 @@ const GlobalChatScreen = () => {
 
   const { globalRoom } = useGlobalRoom();
   const roomId = globalRoom?._id;
+  useActiveChatRoom(roomId);
   const { profilePreview, profileLoading, showProfile, openProfile, closeProfile } = useUserProfile();
 
   useEffect(() => {
@@ -93,7 +95,6 @@ const GlobalChatScreen = () => {
       return () => {
         socketService.off('previous_messages', handlePrevious);
         socketService.off('receive_message', handleReceive);
-        socketService.leaveRoom(roomId);
       };
     };
 
