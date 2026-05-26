@@ -149,8 +149,6 @@ export const authService = {
 
   // POST /api/users
   register: async (data: RegisterRequest): Promise<void> => {
-    if (USE_MOCK) return;
-
     try {
       await api.post('/api/users', data);
     } catch (e) {
