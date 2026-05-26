@@ -20,6 +20,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { placesService } from '../services/placesService';
 import { uploadService } from '../services/uploadService';
+import {
+  extractCoordinatesFromText,
+  parseCoordinateFields,
+  SARAJEVO_CENTER,
+} from '../utils/mapCoordinates';
 
 const SubmitPlaceScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -28,6 +33,8 @@ const SubmitPlaceScreen = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [pictureUris, setPictureUris] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -76,6 +83,14 @@ const SubmitPlaceScreen = () => {
       Alert.alert('Missing title', 'Please enter a place name.');
       return;
     }
+    const coords = parseCoordinateFields(latitude, longitude);
+    if (!coords) {
+      Alert.alert(
+        'Coordinates required',
+        'Enter valid latitude and longitude so the place appears correctly on the map (no slow geocoding).',
+      );
+      return;
+    }
     setSubmitting(true);
     try {
       let displayUrl: string | undefined;
@@ -106,6 +121,8 @@ const SubmitPlaceScreen = () => {
         title: name,
         description: description.trim() || undefined,
         address: address.trim() || undefined,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         displayUrl,
         pictures,
       };
@@ -171,6 +188,51 @@ const SubmitPlaceScreen = () => {
           placeholderTextColor={colors.mutedForeground}
           style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
         />
+
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>Map coordinates (required)</Text>
+        <Text style={[styles.coordHint, { color: colors.mutedForeground }]}>
+          Open Google Maps → place → Share → copy link, paste below. Do not use city center for a real venue.
+        </Text>
+        <TextInput
+          placeholder="Paste Google Maps link (optional)"
+          placeholderTextColor={colors.mutedForeground}
+          onChangeText={(text) => {
+            const coords = extractCoordinatesFromText(text);
+            if (coords) {
+              setLatitude(String(coords.latitude));
+              setLongitude(String(coords.longitude));
+            }
+          }}
+          style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
+        />
+        <View style={styles.coordRow}>
+          <TextInput
+            value={latitude}
+            onChangeText={setLatitude}
+            placeholder="Latitude"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="decimal-pad"
+            style={[styles.input, styles.coordInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
+          />
+          <TextInput
+            value={longitude}
+            onChangeText={setLongitude}
+            placeholder="Longitude"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="decimal-pad"
+            style={[styles.input, styles.coordInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
+          />
+        </View>
+        <TouchableOpacity
+          style={[styles.centerBtn, { borderColor: colors.border }]}
+          onPress={() => {
+            setLatitude(String(SARAJEVO_CENTER.latitude));
+            setLongitude(String(SARAJEVO_CENTER.longitude));
+          }}
+        >
+          <Ionicons name="locate-outline" size={16} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Use Sarajevo center</Text>
+        </TouchableOpacity>
 
         <Text style={[styles.label, { color: colors.mutedForeground }]}>Contact email (guests)</Text>
         <TextInput
@@ -253,6 +315,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   multiline: { minHeight: 100, textAlignVertical: 'top' },
+  coordHint: { fontSize: 11, lineHeight: 16, marginBottom: 4 },
+  coordRow: { flexDirection: 'row', gap: 10 },
+  coordInput: { flex: 1 },
+  centerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginTop: 4,
+    marginBottom: 4,
+  },
   pickBtn: {
     flexDirection: 'row',
     alignItems: 'center',
