@@ -461,46 +461,64 @@ const GmAdminScreen = () => {
     ]);
   };
 
+  const isTabRoot = navigation.getParent()?.getState().type === 'tab';
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Admin</Text>
+      {isTabRoot ? (
+        <View style={[styles.subHeader, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.subHeaderTitle, { color: colors.foreground }]}>Admin</Text>
+        </View>
+      ) : (
+        <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 10 }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Admin</Text>
+        </View>
+      )}
+
+      <View style={[styles.tabBarWrap, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBarContent}
+        >
+          {TAB_ORDER.map((t) => {
+            const active = tab === t;
+            return (
+              <TouchableOpacity
+                key={t}
+                onPress={() => setTab(t)}
+                style={[
+                  styles.tabPill,
+                  {
+                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.primary + '18' : colors.card,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabPillText,
+                    { color: active ? colors.primary : colors.mutedForeground },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {t}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.tabScroll, { borderBottomColor: colors.border }]}
-        contentContainerStyle={styles.tabScrollContent}
+        style={styles.body}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        {TAB_ORDER.map((t) => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => setTab(t)}
-            style={[
-              styles.tabPill,
-              { borderColor: colors.border, backgroundColor: colors.card },
-              tab === t && { borderColor: colors.primary, backgroundColor: colors.primary + '18' },
-            ]}
-          >
-            <Text
-              style={{
-                fontWeight: '700',
-                fontSize: 13,
-                color: tab === t ? colors.primary : colors.mutedForeground,
-                textTransform: 'capitalize',
-              }}
-            >
-              {t}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {tab === 'roles' ? (
           <>
             <TouchableOpacity
@@ -925,6 +943,13 @@ const GmAdminScreen = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  subHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+  },
+  subHeaderTitle: { fontSize: 20, fontWeight: '700' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -934,16 +959,33 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
-  tabScroll: { maxHeight: 52, borderBottomWidth: 1 },
-  tabScrollContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'center' },
+  tabBarWrap: {
+    borderBottomWidth: 1,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  tabBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   tabPill: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 20,
     borderWidth: 1.5,
-    marginRight: 4,
+    marginRight: 8,
+    minHeight: 36,
+    justifyContent: 'center',
   },
-  scroll: { padding: 16, paddingBottom: 48 },
+  tabPillText: {
+    fontWeight: '700',
+    fontSize: 13,
+    textTransform: 'capitalize',
+  },
+  body: { flex: 1 },
+  scroll: { padding: 16, paddingBottom: 48, flexGrow: 1 },
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
   card: { padding: 14, borderRadius: 12, borderWidth: 1 },
   outlineBtn: {

@@ -2,12 +2,15 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
+import { isAdminOrGmUser } from '../utils/userRole';
 import AppHeader from '../components/AppHeader';
 import HomeScreen from '../screens/HomeScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import ExploreScreen from '../screens/ExploreScreen';
 import ChatsScreen from '../screens/ChatsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import GmAdminScreen from '../screens/GmAdminScreen';
 import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -24,16 +27,19 @@ const tabConfig: {
   { name: 'Profile', icon: 'person-outline', activeIcon: 'person' },
 ];
 
-const screenComponents: Record<keyof MainTabParamList, React.ComponentType<any>> = {
+const screenComponents: Record<keyof MainTabParamList, React.ComponentType<object>> = {
   Home: HomeScreen,
   Calendar: CalendarScreen,
   Explore: ExploreScreen,
   Chats: ChatsScreen,
   Profile: ProfileScreen,
+  Admin: GmAdminScreen,
 };
 
 export default function MainTabs() {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  const isAdminOrGm = isAdminOrGmUser(user?.type);
 
   return (
     <>
@@ -51,7 +57,7 @@ export default function MainTabs() {
             paddingTop: 6,
           },
           tabBarLabelStyle: {
-            fontSize: 10,
+            fontSize: isAdminOrGm ? 9 : 10,
             fontWeight: '500',
           },
         }}
@@ -62,7 +68,7 @@ export default function MainTabs() {
             name={tab.name}
             component={screenComponents[tab.name]}
             options={{
-              tabBarIcon: ({ focused, color, size }) => (
+              tabBarIcon: ({ focused, color }) => (
                 <Ionicons
                   name={focused ? tab.activeIcon : tab.icon}
                   size={22}
@@ -72,6 +78,22 @@ export default function MainTabs() {
             }}
           />
         ))}
+        {isAdminOrGm && (
+          <Tab.Screen
+            name="Admin"
+            component={screenComponents.Admin}
+            options={{
+              tabBarLabel: 'Admin',
+              tabBarIcon: ({ focused, color }) => (
+                <Ionicons
+                  name={focused ? 'shield' : 'shield-outline'}
+                  size={22}
+                  color={color}
+                />
+              ),
+            }}
+          />
+        )}
       </Tab.Navigator>
     </>
   );

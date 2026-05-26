@@ -227,15 +227,6 @@ const ProfileScreen = () => {
       label: 'Business partnership',
       onPress: () => navigation.navigate('BusinessPartnership'),
     },
-    ...(user?.type === 'GM'
-      ? [
-          {
-            icon: 'layers-outline' as const,
-            label: 'Admin: roles & sponsors',
-            onPress: () => navigation.navigate('GmAdmin'),
-          },
-        ]
-      : []),
     {
       icon: 'help-circle-outline' as const,
       label: 'FAQ',

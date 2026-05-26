@@ -38,6 +38,7 @@ export type MainTabParamList = {
   Explore: undefined;
   Chats: undefined;
   Profile: undefined;
+  Admin: undefined;
 };
 
 // ---------------------------------------------------------------------------
