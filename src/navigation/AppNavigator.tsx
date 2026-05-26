@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
 import { SplashScreen, AuthScreen } from '../screens';
 import MainTabs from './MainTabs';
 import type { RootStackParamList } from './types';
@@ -48,6 +49,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <NotificationProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isLoggedIn ? (
           <>
@@ -80,6 +82,7 @@ export default function AppNavigator() {
           </Stack.Screen>
         )}
       </Stack.Navigator>
+      </NotificationProvider>
     </NavigationContainer>
   );
 }
