@@ -11,11 +11,13 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { socketService } from '../services/socketService';
+import { chatService } from '../services/chatService';
 import { authService } from '../services/authService';
 import { useGlobalRoom } from '../hooks/useChatRooms';
 import { useUserProfile } from '../hooks/useUserProfile';
@@ -49,6 +51,8 @@ const GlobalChatScreen = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const [votedIndex, setVotedIndex] = useState<number | null>(null);
+  const [isLoadingOld, setIsLoadingOld] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const { getAvatarUrl, prefetchForMessages } = useChatUserAvatars();
 
   const { globalRoom } = useGlobalRoom();
@@ -74,7 +78,7 @@ const GlobalChatScreen = () => {
 
       const handlePrevious = (data: { roomId: string; messages: unknown[] } | unknown[]) => {
         if (!isMounted) return;
-        const formatted = formatSocketChatMessages(data, currentUser?._id);
+        const formatted = formatSocketChatMessages(data, currentUser?._id).reverse();
         setMessages(formatted);
         void prefetchForMessages(formatted);
       };
@@ -83,9 +87,8 @@ const GlobalChatScreen = () => {
         if (!isMounted) return;
         const row = formatSocketChatMessage(m, currentUser?._id);
         if (!row) return;
-        setMessages((prev) => [...prev, row]);
+        setMessages((prev) => [row, ...prev]);
         void prefetchForMessages([row]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       };
 
       socketService.on('previous_messages', handlePrevious);
@@ -112,6 +115,24 @@ const GlobalChatScreen = () => {
     await socketService.connect();
     socketService.sendMessage(roomId, input.trim());
     setInput('');
+  };
+
+  const loadOlderMessages = async () => {
+    if (isLoadingOld || !hasMore || !roomId) return;
+    setIsLoadingOld(true);
+    try {
+      const response = await chatService.getRoomMessages(roomId, 30, messages.length);
+      if (response.messages.length > 0) {
+        const formattedOldMsgs = formatSocketChatMessages(response.messages, currentUser?._id).reverse();
+        setMessages((prev) => [...prev, ...formattedOldMsgs]);
+        void prefetchForMessages(formattedOldMsgs);
+      }
+      setHasMore(response.hasMore);
+    } catch (error) {
+      console.error("Eski mesajlar çekilemedi", error);
+    } finally {
+      setIsLoadingOld(false);
+    }
   };
 
   return (
@@ -177,6 +198,12 @@ const GlobalChatScreen = () => {
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.messages}
+        inverted={true}
+        onEndReached={loadOlderMessages}
+        onEndReachedThreshold={0.2}
+        ListFooterComponent={
+          isLoadingOld ? <ActivityIndicator size="small" color={colors.primary} style={{ margin: 10 }} /> : null
+        }
         renderItem={({ item: msg }) => {
           const avatarUrl = getAvatarUrl(msg.senderId, msg.displayUrl);
 

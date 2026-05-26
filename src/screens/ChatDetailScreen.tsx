@@ -152,7 +152,7 @@ const ChatDetailScreen = () => {
           text: m.message ?? m.content ?? '',
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isMe: m.senderId === currentUser?._id,
-        }));
+        })).reverse();
         // NOT: Liste inverted olduğu için eski mesajlar dizinin SONUNA eklenmelidir!
         setMessages((prev) => [...prev, ...formattedOldMsgs]);
       }
