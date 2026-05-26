@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
 import { SplashScreen, AuthScreen } from '../screens';
+import { authService } from '../services/authService';
 import MainTabs from './MainTabs';
 import type { RootStackParamList } from './types';
 
@@ -35,6 +36,15 @@ export default function AppNavigator() {
   const { colors } = useTheme();
   const { isLoggedIn, login } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
+
+  // ---- Check Session on Startup ----
+  useEffect(() => {
+    authService.getStoredUser().then((user) => {
+      if (user) {
+        login();
+      }
+    });
+  }, [login]);
 
   // ---- Splash (shown before NavigationContainer mounts) ----
   if (showSplash) {
