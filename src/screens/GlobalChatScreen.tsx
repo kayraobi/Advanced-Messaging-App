@@ -124,7 +124,10 @@ const GlobalChatScreen = () => {
       const response = await chatService.getRoomMessages(roomId, 30, messages.length);
       if (response.messages.length > 0) {
         const formattedOldMsgs = formatSocketChatMessages(response.messages, currentUser?._id).reverse();
-        setMessages((prev) => [...prev, ...formattedOldMsgs]);
+        setMessages((prev) => {
+          const newMsgs = formattedOldMsgs.filter((newMsg) => !prev.some((p) => p.id === newMsg.id));
+          return [...prev, ...newMsgs];
+        });
         void prefetchForMessages(formattedOldMsgs);
       }
       setHasMore(response.hasMore);
