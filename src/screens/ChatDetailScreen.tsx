@@ -154,7 +154,10 @@ const ChatDetailScreen = () => {
           isMe: m.senderId === currentUser?._id,
         })).reverse();
         // NOT: Liste inverted olduğu için eski mesajlar dizinin SONUNA eklenmelidir!
-        setMessages((prev) => [...prev, ...formattedOldMsgs]);
+        setMessages((prev) => {
+          const newMsgs = formattedOldMsgs.filter((newMsg) => !prev.some((p) => p.id === newMsg.id));
+          return [...prev, ...newMsgs];
+        });
       }
       
       setHasMore(response.hasMore);
