@@ -13,8 +13,18 @@ import { useAuth } from './AuthContext';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
 import { socketService } from '../services/socketService';
+import { newsService } from '../services/newsService';
+import { eventService } from '../services/eventService';
+import { diffAndRecordSeen } from '../services/contentNotificationService';
 import { useNotificationsState } from '../hooks/useNotifications';
 import type { NewNotification, Notification } from '../types/notification.types';
+
+/** Delay the first content check so it never blocks app startup/login. */
+const CONTENT_FIRST_SYNC_DELAY_MS = 8 * 1000;
+/** How often to re-check the API for newly published news / events. */
+const CONTENT_POLL_MS = 5 * 60 * 1000;
+/** Avoid flooding: cap how many new-content notifications we add per sync. */
+const MAX_CONTENT_NOTIFS_PER_SYNC = 5;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -66,6 +76,40 @@ function buildChatNotification(payload: unknown): NewNotification | null {
     emoji: '💬',
     title: `${senderName} sent a message`,
     body: preview || undefined,
+  };
+}
+
+function firstNonEmptyLine(value: unknown): string {
+  const text = Array.isArray(value) ? value.join(' ') : String(value ?? '');
+  const line = text.split('\n').map((s) => s.trim()).find((s) => s.length > 0) ?? '';
+  return line.length > 100 ? `${line.slice(0, 97)}...` : line;
+}
+
+function buildNewsNotification(item: unknown): NewNotification | null {
+  if (!item || typeof item !== 'object') return null;
+  const m = item as Record<string, unknown>;
+  const id = typeof m._id === 'string' ? m._id : undefined;
+  const title = String(m.title ?? '').trim() || 'New article';
+  return {
+    id: id ? `news-${id}` : undefined,
+    type: 'news',
+    emoji: '📰',
+    title: 'New article published',
+    body: title,
+  };
+}
+
+function buildEventNotification(item: unknown): NewNotification | null {
+  if (!item || typeof item !== 'object') return null;
+  const m = item as Record<string, unknown>;
+  const id = typeof m._id === 'string' ? m._id : undefined;
+  const preview = firstNonEmptyLine(m.content) || 'A new event was added';
+  return {
+    id: id ? `event-${id}` : undefined,
+    type: 'event',
+    emoji: '📅',
+    title: 'New event added',
+    body: preview,
   };
 }
 
@@ -174,6 +218,54 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     if (!isLoggedIn) return;
     void ensurePushPermissions();
   }, [isLoggedIn]);
+
+  // Poll News & Events; notify when the API has content not yet seen locally.
+  // Deliberately defensive: delayed first run, every async path guarded, so a
+  // failure here can never crash or block the app.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    let mounted = true;
+
+    const syncContent = async () => {
+      try {
+        const news = await newsService.getAll().catch(() => []);
+        const newsDiff = await diffAndRecordSeen('news', news);
+        if (mounted && !newsDiff.isBaseline) {
+          for (const item of newsDiff.newItems.slice(0, MAX_CONTENT_NOTIFS_PER_SYNC)) {
+            const notif = buildNewsNotification(item);
+            if (notif) void api.addNotification(notif);
+          }
+        }
+      } catch {
+        // ignore — never let content sync surface an error
+      }
+
+      try {
+        // Use the wider window so freshly added events (whose post date may be
+        // old, pushing them out of the small default page) are still detected.
+        const events = await eventService.getAllForSync(500).catch(() => []);
+        const eventDiff = await diffAndRecordSeen('event', events);
+        if (mounted && !eventDiff.isBaseline) {
+          for (const item of eventDiff.newItems.slice(0, MAX_CONTENT_NOTIFS_PER_SYNC)) {
+            const notif = buildEventNotification(item);
+            if (notif) void api.addNotification(notif);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const firstTimer = setTimeout(() => void syncContent(), CONTENT_FIRST_SYNC_DELAY_MS);
+    const interval = setInterval(() => void syncContent(), CONTENT_POLL_MS);
+
+    return () => {
+      mounted = false;
+      clearTimeout(firstTimer);
+      clearInterval(interval);
+    };
+  }, [isLoggedIn, api.addNotification]);
 
   useEffect(() => {
     if (!isLoggedIn) return;

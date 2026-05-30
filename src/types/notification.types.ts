@@ -1,4 +1,10 @@
-export type NotificationType = 'chat' | 'system' | 'push' | 'event' | 'weather';
+export type NotificationType =
+  | 'chat'
+  | 'system'
+  | 'push'
+  | 'event'
+  | 'news'
+  | 'weather';
 
 export interface Notification {
   id: string;
