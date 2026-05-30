@@ -32,6 +32,21 @@ export const eventService = {
     }
   },
 
+  /**
+   * GET /api/events?limit=N — fetch a larger window of events.
+   * The default getAll() returns only a small page (~10), which is fine for the
+   * UI but can miss freshly added events whose post date is old. Used by the
+   * notification sync so newly created events are reliably detected.
+   */
+  async getAllForSync(limit = 500): Promise<any[]> {
+    try {
+      const res = await api.get<unknown>(`/api/events?limit=${limit}`);
+      return unwrapApiList(res.data);
+    } catch (e) {
+      throw handleError(e);
+    }
+  },
+
   // GET /api/events/featured — Get featured 10 events
   async getFeatured(): Promise<Event[]> {
     try {
