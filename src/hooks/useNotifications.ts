@@ -103,5 +103,3 @@ export function useNotificationsState() {
     markAsRead,
   };
 }
-
-export { useNotifications } from '../contexts/NotificationContext';

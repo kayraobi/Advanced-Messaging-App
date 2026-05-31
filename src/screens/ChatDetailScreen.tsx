@@ -137,7 +137,10 @@ const ChatDetailScreen = () => {
   };
 
   const loadOlderMessages = async () => {
-    if (isLoadingOld || !hasMore || !socketRoomId) return;
+    // Guard: only call the API if socketRoomId looks like a valid MongoDB ObjectId.
+    // If it's a mock/local id like "event-123" the request will 404 anyway.
+    const isValidMongoId = /^[a-f\d]{24}$/i.test(socketRoomId ?? '');
+    if (isLoadingOld || !hasMore || !socketRoomId || !isValidMongoId) return;
     setIsLoadingOld(true);
     try {
       // Elimizdeki mesaj sayısı kadar (skip) atlayıp, İbrahim'in API'sinden eskileri çekiyoruz

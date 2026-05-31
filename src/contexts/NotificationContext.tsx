@@ -7,6 +7,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useAuth } from './AuthContext';
@@ -25,6 +26,100 @@ const CONTENT_FIRST_SYNC_DELAY_MS = 8 * 1000;
 const CONTENT_POLL_MS = 5 * 60 * 1000;
 /** Avoid flooding: cap how many new-content notifications we add per sync. */
 const MAX_CONTENT_NOTIFS_PER_SYNC = 5;
+
+/** AsyncStorage key for the last date we sent a weather notification (YYYY-MM-DD). */
+const WEATHER_LAST_DATE_KEY = '@sarajevo_last_weather_date';
+/** Delay before the first weather check so it doesn't compete with app startup. */
+const WEATHER_FIRST_DELAY_MS = 5 * 1000;
+
+// Sarajevo coordinates — same as useWeather.ts
+const WEATHER_LAT = 43.8564;
+const WEATHER_LON = 18.4131;
+
+function todayDateString(): string {
+  return new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+}
+
+async function shouldSendWeatherToday(): Promise<boolean> {
+  try {
+    const stored = await AsyncStorage.getItem(WEATHER_LAST_DATE_KEY);
+    return stored !== todayDateString();
+  } catch {
+    return true; // if storage fails, allow the notification
+  }
+}
+
+async function markWeatherSentToday(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(WEATHER_LAST_DATE_KEY, todayDateString());
+  } catch {
+    // non-fatal
+  }
+}
+
+function weatherEmoji(code: number): string {
+  if (code === 0 || code === 1) return '☀️';
+  if (code === 2) return '⛅';
+  if (code === 3) return '☁️';
+  if (code === 45 || code === 48) return '🌫️';
+  if (code >= 51 && code <= 55) return '🌦️';
+  if (code >= 61 && code <= 65) return '🌧️';
+  if (code >= 71 && code <= 77) return '❄️';
+  if (code >= 80 && code <= 82) return '🌧️';
+  if (code >= 85 && code <= 86) return '🌨️';
+  if (code >= 95 && code <= 99) return '⛈️';
+  return '🌡️';
+}
+
+function weatherDescription(code: number): string {
+  if (code === 0 || code === 1) return 'Clear and sunny';
+  if (code === 2) return 'Partly cloudy';
+  if (code === 3) return 'Overcast';
+  if (code === 45 || code === 48) return 'Foggy';
+  if (code >= 51 && code <= 55) return 'Light drizzle';
+  if (code >= 61 && code <= 65) return 'Rainy';
+  if (code >= 71 && code <= 77) return 'Snowy';
+  if (code >= 80 && code <= 82) return 'Heavy rain showers';
+  if (code >= 85 && code <= 86) return 'Snow showers';
+  if (code >= 95 && code <= 99) return 'Thunderstorm';
+  return 'Variable conditions';
+}
+
+async function fetchAndNotifyWeather(addNotification: (n: import('../types/notification.types').NewNotification) => Promise<unknown>): Promise<void> {
+  try {
+    const shouldSend = await shouldSendWeatherToday();
+    if (!shouldSend) return;
+
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
+      `&current=temperature_2m,weather_code` +
+      `&timezone=Europe%2FSarajevo` +
+      `&forecast_days=1`;
+
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const json = await res.json() as { current?: { temperature_2m?: number; weather_code?: number } };
+
+    const temp = Math.round(json.current?.temperature_2m ?? 0);
+    const code = json.current?.weather_code ?? -1;
+    if (code < 0) return;
+
+    const emoji = weatherEmoji(code);
+    const desc = weatherDescription(code);
+
+    await addNotification({
+      type: 'weather',
+      emoji,
+      title: `Sarajevo Weather ${emoji}`,
+      body: `${desc} · ${temp}°C today`,
+    });
+
+    await markWeatherSentToday();
+  } catch {
+    // never throw — a weather failure must not affect the rest of the app
+  }
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -264,6 +359,19 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       clearTimeout(firstTimer);
       clearInterval(interval);
+    };
+  }, [isLoggedIn, api.addNotification]);
+
+  // Send a single daily weather notification on first app open of the day.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (!cancelled) void fetchAndNotifyWeather(api.addNotification);
+    }, WEATHER_FIRST_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
     };
   }, [isLoggedIn, api.addNotification]);
 

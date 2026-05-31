@@ -13,7 +13,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeather } from '../hooks/useWeather';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotifications } from '../contexts/NotificationContext';
 import { formatNotificationTime } from '../utils/notificationTime';
 import WeatherModal from './WeatherModal';
 

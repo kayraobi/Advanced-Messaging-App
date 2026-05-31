@@ -45,7 +45,7 @@ const ChatsScreen = () => {
   const { data: rooms = [] } = useChatRooms();
   const { data: dmRooms = [], isLoading: isDmLoading } = useDmRooms(currentUser?._id ?? null);
 
-  const eventList = useMemo(() => (rawEvents as any[]).slice(0, 5), [rawEvents]);
+  const eventList = useMemo(() => rawEvents as any[], [rawEvents]);
   const eventRoomMap = useMemo(() => {
     const map: Record<string, string> = {};
     rooms.forEach((r) => {
@@ -53,6 +53,12 @@ const ChatsScreen = () => {
     });
     return map;
   }, [rooms]);
+
+  // Filter ALL events to those with a real chat room, then cap at 5.
+  const eventListWithRooms = useMemo(
+    () => eventList.filter((e: any) => !!eventRoomMap[e._id]).slice(0, 5),
+    [eventList, eventRoomMap],
+  );
 
   useEffect(() => {
     AsyncStorage.getItem('auth_user').then((raw) => {
@@ -182,14 +188,14 @@ const ChatsScreen = () => {
             <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
           ) : (
             <View style={[styles.chatList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {eventList.length === 0 ? (
+              {eventListWithRooms.length === 0 ? (
                 <View style={{ padding: 20, alignItems: 'center' }}>
                   <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
                     No event chats yet.
                   </Text>
                 </View>
               ) : (
-                eventList.map((event, idx) => {
+                eventListWithRooms.map((event, idx) => {
                   const title =
                     (typeof event.content === 'string'
                       ? event.content
