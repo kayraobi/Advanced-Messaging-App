@@ -23,6 +23,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { realEstateService } from '../services/realEstateService';
 import type { RealEstate } from '../services/realEstateService';
 import type { User } from '../types/user.types';
+import GamesModal from '../components/GamesModal';
+import FeedbackModal from '../components/FeedbackModal';
 
 const allInterests = ['Sports', 'Culture', 'Food & Drink', 'Tech', 'Networking', 'Music', 'Travel', 'Volunteering'];
 
@@ -43,6 +45,8 @@ const ProfileScreen = () => {
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
   const [showListings, setShowListings] = useState(false);
+  const [showGames, setShowGames] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [myListings, setMyListings] = useState<RealEstate[]>([]);
   const [myListingsLoading, setMyListingsLoading] = useState(false);
 
@@ -226,6 +230,16 @@ const ProfileScreen = () => {
       icon: 'briefcase-outline' as const,
       label: 'Business partnership',
       onPress: () => navigation.navigate('BusinessPartnership'),
+    },
+    {
+      icon: 'game-controller-outline' as const,
+      label: 'Games',
+      onPress: () => setShowGames(true),
+    },
+    {
+      icon: 'chatbox-ellipses-outline' as const,
+      label: 'Send Feedback',
+      onPress: () => setShowFeedback(true),
     },
     {
       icon: 'help-circle-outline' as const,
@@ -557,6 +571,17 @@ const ProfileScreen = () => {
           )}
         </View>
       </Modal>
+
+      {/* Games Modal */}
+      <GamesModal visible={showGames} onClose={() => setShowGames(false)} />
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        visible={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        userName={user?.name ?? user?.username}
+        userEmail={user?.email}
+      />
 
       {/* Logout Confirm Modal */}
       <Modal
