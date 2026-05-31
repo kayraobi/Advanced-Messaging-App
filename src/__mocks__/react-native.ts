@@ -1,9 +1,9 @@
 import { jest } from '@jest/globals';
 
-export const Platform = { OS: 'ios', select: jest.fn((obj: Record<string, unknown>) => obj.ios ?? obj.default) };
+export const Platform = { OS: 'ios', select: jest.fn((obj: Record<string, unknown>) => obj['ios'] ?? obj['default']) };
 export const Alert = { alert: jest.fn() };
 export const Animated = {
-  Value: jest.fn().mockImplementation((v: number) => ({ _value: v })),
+  Value: jest.fn().mockImplementation((v: unknown) => ({ _value: v })),
   timing: jest.fn().mockReturnValue({ start: jest.fn() }),
   sequence: jest.fn().mockReturnValue({ start: jest.fn() }),
   View: 'Animated.View',
