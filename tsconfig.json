@@ -15,6 +15,9 @@
   ],
   "exclude": [
     "node_modules",
-    "backend"
+    "backend",
+    "src/__mocks__",
+    "src/__tests__",
+    "coverage"
   ]
 }
