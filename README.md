@@ -357,8 +357,6 @@ On screen open: return cached data immediately → fetch fresh in background if 
 | Kayra Yılmaz | 220302421 | Lead Developer |
 | Ata Arda Kara | 230302007 | Database Engineer |
 
-**Instructor:** Mirza Selimović &nbsp;|&nbsp; **Lab Assistant:** Adna Dedić &nbsp;|&nbsp; **Course:** CS308 Software Engineering — IUS
-
 ---
 
 ## Contributing
